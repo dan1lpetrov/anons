@@ -1,6 +1,13 @@
-import type { Product } from '../types';
+import type { Product, SaleId } from '../types';
+import { sales } from './sales';
 
-export const products: Product[] = [
+type ProductSeed = Omit<Product, 'sourceName' | 'sourceUrl'>;
+
+const saleSources: Record<SaleId, Pick<Product, 'sourceName' | 'sourceUrl'>> = Object.fromEntries(
+  sales.map(({ id, name, url }) => [id, { sourceName: name, sourceUrl: url }]),
+) as Record<SaleId, Pick<Product, 'sourceName' | 'sourceUrl'>>;
+
+const productSeeds: ProductSeed[] = [
   {
     id: 'tshirt-basic-white',
     name: 'Базова бавовняна футболка',
@@ -195,6 +202,11 @@ export const products: Product[] = [
     featuredRank: 9,
   },
 ];
+
+export const products: Product[] = productSeeds.map((product) => ({
+  ...product,
+  ...saleSources[product.saleId],
+}));
 
 export function getProductById(id: string): Product | undefined {
   return products.find((p) => p.id === id);

@@ -30,6 +30,8 @@ export interface Product {
   originalPrice?: number;
   categoryId: CategoryId;
   saleId: SaleId;
+  sourceName: string;
+  sourceUrl: string;
   image: string;
   sizes: string[];
   colors: ProductColor[];

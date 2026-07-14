@@ -18,6 +18,7 @@ import {
 } from './utils/orderExport';
 
 const SCREEN_TITLES: Record<Screen, string> = {
+  home: 'Anons Shop',
   catalog: 'Anons Shop',
   product: 'Товар',
   cart: 'Кошик',

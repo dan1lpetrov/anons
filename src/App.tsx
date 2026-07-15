@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CartView } from './components/CartView';
 import { CategoryFilter } from './components/CategoryFilter';
+import { CatalogControls } from './components/CatalogControls';
 import { CheckoutForm } from './components/CheckoutForm';
 import { Header } from './components/Header';
 import { OrderSuccess } from './components/OrderSuccess';
 import { ProductCard } from './components/ProductCard';
 import { ProductDetail } from './components/ProductDetail';
 import { products } from './data/products';
+import { sales } from './data/sales';
 import { useCart } from './hooks/useCart';
 import { useTelegram } from './hooks/useTelegram';
-import type { CategoryId, Order, OrderForm, Screen } from './types';
+import type { CatalogFilters, CategoryId, Order, OrderForm, Screen, SortOption } from './types';
+import { filterAndSortProducts, getAvailableColors, getAvailableSizes } from './utils/catalog';
 import {
   createOrderId,
   downloadOrderTxt,
@@ -20,7 +23,7 @@ import {
 const SCREEN_TITLES: Record<Screen, string> = {
   home: 'Anons Shop',
   catalog: 'Anons Shop',
-  product: 'Товар',
+  product: 'Anons Shop',
   cart: 'Кошик',
   checkout: 'Оформлення',
   success: 'Готово',
@@ -32,6 +35,8 @@ export default function App() {
 
   const [screen, setScreen] = useState<Screen>('catalog');
   const [category, setCategory] = useState<CategoryId | 'all'>('all');
+  const [filters, setFilters] = useState<CatalogFilters>({ search: '', sizes: [], colors: [], brands: [] });
+  const [sort, setSort] = useState<SortOption>('recommended');
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
   const [sentToTelegram, setSentToTelegram] = useState(false);
@@ -41,10 +46,22 @@ export default function App() {
     [selectedProductId],
   );
 
-  const filteredProducts = useMemo(
-    () => (category === 'all' ? products : products.filter((p) => p.categoryId === category)),
+  const catalogContext = useMemo(
+    () => category === 'all' ? { mode: 'all' as const } : { mode: 'category' as const, categoryId: category },
     [category],
   );
+  const filteredProducts = useMemo(
+    () => filterAndSortProducts(products, catalogContext, filters, sort),
+    [catalogContext, filters, sort],
+  );
+  const selectableProducts = useMemo(
+    () => category === 'all' ? products : products.filter((product) => product.categoryId === category),
+    [category],
+  );
+  const resetFilters = () => {
+    setFilters({ search: '', sizes: [], colors: [], brands: [] });
+    setSort('recommended');
+  };
 
   const navigate = useCallback((next: Screen) => {
     haptic('light');
@@ -165,6 +182,9 @@ export default function App() {
         cartCount={cart.totalItems}
         showCart={screen === 'catalog' || screen === 'product'}
         onCartClick={() => navigate('cart')}
+        searchValue={filters.search}
+        onSearchChange={(search) => setFilters({ ...filters, search })}
+        onHomeClick={() => navigate('catalog')}
       />
 
       <main className="app-main">
@@ -174,20 +194,31 @@ export default function App() {
               Розпродажі одягу з популярних магазинів. Оберіть товар — ми сформуємо замовлення для ручного викупу.
             </p>
             <CategoryFilter active={category} onChange={setCategory} />
-            <div className="product-grid">
-              {filteredProducts.map((product) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  onClick={() => openProduct(product.id)}
-                />
-              ))}
-            </div>
+            <CatalogControls
+              filters={filters}
+              sort={sort}
+              sizes={getAvailableSizes(selectableProducts)}
+              colors={getAvailableColors(selectableProducts)}
+              brands={sales}
+              resultCount={filteredProducts.length}
+              onFiltersChange={setFilters}
+              onSortChange={setSort}
+              onReset={resetFilters}
+            />
+            {filteredProducts.length ? (
+              <div className="product-grid">
+                {filteredProducts.map((product) => (
+                  <ProductCard key={product.id} product={product} onClick={() => openProduct(product.id)} />
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state"><span className="empty-state__icon">🔎</span><h2>Нічого не знайдено</h2><p>Спробуйте змінити параметри пошуку або фільтри.</p></div>
+            )}
           </>
         )}
 
         {screen === 'product' && selectedProduct && (
-          <ProductDetail product={selectedProduct} onAddToCart={handleAddToCart} />
+          <ProductDetail product={selectedProduct} onAddToCart={handleAddToCart} onBack={() => navigate('catalog')} />
         )}
 
         {screen === 'cart' && (

@@ -1,16 +1,18 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { Product } from '../types';
 import { discountPercent, formatPrice } from '../utils/format';
 
 interface ProductDetailProps {
   product: Product;
   onAddToCart: (size: string, colorId: string, quantity: number) => void;
+  onBack: () => void;
 }
 
-export function ProductDetail({ product, onAddToCart }: ProductDetailProps) {
+export function ProductDetail({ product, onAddToCart, onBack }: ProductDetailProps) {
   const [size, setSize] = useState(product.sizes[0] ?? '');
   const [colorId, setColorId] = useState(product.colors[0]?.id ?? '');
   const [quantity, setQuantity] = useState(1);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
 
   const discount = discountPercent(product.price, product.originalPrice);
   const selectedColor = product.colors.find((c) => c.id === colorId);
@@ -21,7 +23,16 @@ export function ProductDetail({ product, onAddToCart }: ProductDetailProps) {
   };
 
   return (
-    <div className="product-detail">
+    <div
+      className="product-detail"
+      onTouchStart={(event) => { const touch = event.touches[0]; touchStart.current = { x: touch.clientX, y: touch.clientY }; }}
+      onTouchEnd={(event) => {
+        const start = touchStart.current;
+        const touch = event.changedTouches[0];
+        if (start && start.x <= 32 && touch.clientX - start.x > 80 && Math.abs(touch.clientY - start.y) < 70) onBack();
+        touchStart.current = null;
+      }}
+    >
       <div className="product-detail__hero">
         <img src={product.image} alt={product.name} />
         {discount && <span className="product-detail__badge">−{discount}%</span>}

@@ -31,6 +31,11 @@ function matchesColors(product: Product, colorIds: string[]): boolean {
   return product.colors.some((c) => colorIds.includes(c.id));
 }
 
+function matchesBrands(product: Product, brands: string[]): boolean {
+  if (brands.length === 0) return true;
+  return brands.includes(product.saleId);
+}
+
 export function filterProducts(
   products: Product[],
   context: CatalogContext,
@@ -41,7 +46,8 @@ export function filterProducts(
       matchesContext(p, context) &&
       matchesSearch(p, filters.search) &&
       matchesSizes(p, filters.sizes) &&
-      matchesColors(p, filters.colors),
+      matchesColors(p, filters.colors) &&
+      matchesBrands(p, filters.brands),
   );
 }
 
@@ -91,5 +97,5 @@ export function getAvailableColors(products: Product[]): ProductColor[] {
 }
 
 export function countActiveFilters(filters: CatalogFilters): number {
-  return filters.sizes.length + filters.colors.length;
+  return filters.sizes.length + filters.colors.length + filters.brands.length;
 }

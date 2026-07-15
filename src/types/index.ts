@@ -79,4 +79,5 @@ export interface CatalogFilters {
   search: string;
   sizes: string[];
   colors: string[];
+  brands: SaleId[];
 }

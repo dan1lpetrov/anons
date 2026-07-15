@@ -664,23 +664,8 @@ img {
   line-height: 1.45;
 }
 
-.checkout-form {
-  padding-top: 8px;
-}
-
-.checkout-summary-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px;
-  border-radius: var(--radius);
-  background: var(--tg-secondary-bg);
-  margin-bottom: 20px;
-}
-
-.checkout-summary-card strong {
-  font-size: 20px;
-  color: var(--tg-button);
+.cart-comment-field {
+  margin: 16px 0;
 }
 
 .form-field {
@@ -708,16 +693,6 @@ img {
 .form-field input:focus,
 .form-field textarea:focus {
   border-color: var(--tg-button);
-}
-
-.info-box {
-  padding: 12px 14px;
-  border-radius: var(--radius-sm);
-  background: var(--tg-secondary-bg);
-  margin-bottom: 20px;
-  font-size: 13px;
-  color: var(--tg-hint);
-  line-height: 1.45;
 }
 
 .success-view {
@@ -761,29 +736,65 @@ img {
   margin-bottom: 4px;
 }
 
-.success-actions-list {
-  list-style: none;
+.success-order-title {
   text-align: left;
-  margin-bottom: 16px;
-  font-size: 14px;
+  font-size: 16px;
+  margin-bottom: 10px;
 }
 
-.success-actions-list li {
-  padding: 8px 0;
+.success-order-list {
+  list-style: none;
+  text-align: left;
+  margin-bottom: 20px;
+}
+
+.success-order-list li {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
   border-bottom: 1px solid var(--tg-secondary-bg);
+}
+
+.success-order-list img {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+}
+
+.success-order-list div {
+  min-width: 0;
+}
+
+.success-order-list strong,
+.success-order-list span {
+  display: block;
+}
+
+.success-order-list strong {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.success-order-list span {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--tg-hint);
+}
+
+.success-order-list b {
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 .success-note {
   font-size: 13px;
   color: var(--tg-hint);
   margin-bottom: 24px;
-}
-
-.success-note code {
-  font-size: 12px;
-  background: var(--tg-secondary-bg);
-  padding: 2px 6px;
-  border-radius: 4px;
 }
 
 @media (min-width: 480px) {

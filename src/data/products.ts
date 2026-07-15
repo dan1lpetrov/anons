@@ -145,7 +145,7 @@ const productSeeds: ProductSeed[] = [
     originalPrice: 4499,
     categoryId: 'shoes',
     saleId: 'nike',
-    image: 'https://images.unsplash.com/photo-1606107557195-0a29cbf1c12a?w=600&h=600&fit=crop',
+    image: 'https://megasport.ua/api/s3/images/megasport-dev/products/3555570144/68d39339521f3-6389105.png',
     sizes: ['39', '40', '41', '42', '43', '44'],
     colors: [
       { id: 'white', name: 'Білий', hex: '#f5f5f5' },

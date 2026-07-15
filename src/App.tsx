@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CartView } from './components/CartView';
 import { CategoryFilter } from './components/CategoryFilter';
 import { CatalogControls } from './components/CatalogControls';
-import { CheckoutForm } from './components/CheckoutForm';
 import { Header } from './components/Header';
 import { OrderSuccess } from './components/OrderSuccess';
 import { ProductCard } from './components/ProductCard';
@@ -11,12 +10,10 @@ import { products } from './data/products';
 import { sales } from './data/sales';
 import { useCart } from './hooks/useCart';
 import { useTelegram } from './hooks/useTelegram';
-import type { CatalogFilters, CategoryId, Order, OrderForm, Screen, SortOption } from './types';
+import type { CatalogFilters, CategoryId, Order, Screen, SortOption } from './types';
 import { filterAndSortProducts, getAvailableColors, getAvailableSizes } from './utils/catalog';
 import {
   createOrderId,
-  downloadOrderTxt,
-  formatOrderText,
   saveOrderToLocalStorage,
 } from './utils/orderExport';
 
@@ -25,12 +22,11 @@ const SCREEN_TITLES: Record<Screen, string> = {
   catalog: 'Anons Shop',
   product: 'Anons Shop',
   cart: 'Кошик',
-  checkout: 'Оформлення',
   success: 'Готово',
 };
 
 export default function App() {
-  const { tg, user, haptic, sendOrderData, showAlert } = useTelegram();
+  const { tg, user, haptic, showAlert } = useTelegram();
   const cart = useCart();
 
   const [screen, setScreen] = useState<Screen>('catalog');
@@ -39,7 +35,6 @@ export default function App() {
   const [sort, setSort] = useState<SortOption>('recommended');
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
-  const [sentToTelegram, setSentToTelegram] = useState(false);
 
   const selectedProduct = useMemo(
     () => products.find((p) => p.id === selectedProductId),
@@ -70,7 +65,6 @@ export default function App() {
 
   const goBack = useCallback(() => {
     if (screen === 'product') navigate('catalog');
-    else if (screen === 'checkout') navigate('cart');
     else if (screen === 'cart') navigate('catalog');
     else if (screen === 'success') navigate('catalog');
   }, [screen, navigate]);
@@ -87,26 +81,11 @@ export default function App() {
           haptic('success');
           showAlert('Додано в кошик!');
         }
-      } else if (screen === 'cart' && cart.totalItems > 0) {
-        navigate('checkout');
-      } else if (screen === 'checkout') {
-        const form = document.querySelector<HTMLFormElement>('.checkout-form');
-        form?.requestSubmit();
       }
     };
 
     if (screen === 'product' && selectedProduct) {
       tg.MainButton.setText('Додати в кошик');
-      tg.MainButton.show();
-      tg.MainButton.enable();
-      tg.MainButton.onClick(handleMainButton);
-    } else if (screen === 'cart' && cart.totalItems > 0) {
-      tg.MainButton.setText('Оформити замовлення');
-      tg.MainButton.show();
-      tg.MainButton.enable();
-      tg.MainButton.onClick(handleMainButton);
-    } else if (screen === 'checkout') {
-      tg.MainButton.setText('Підтвердити');
       tg.MainButton.show();
       tg.MainButton.enable();
       tg.MainButton.onClick(handleMainButton);
@@ -147,11 +126,11 @@ export default function App() {
     showAlert('Додано в кошик!');
   };
 
-  const handleSubmitOrder = (form: OrderForm) => {
+  const handleSubmitOrder = (comment: string) => {
     const order: Order = {
       id: createOrderId(),
       createdAt: new Date().toISOString(),
-      customer: form,
+      customer: { comment },
       items: cart.enrichedItems.map(({ product, color, item, lineTotal }) => ({
         product,
         size: item.size,
@@ -163,11 +142,7 @@ export default function App() {
       telegramUser: user,
     };
 
-    downloadOrderTxt(order);
     saveOrderToLocalStorage(order);
-
-    const sent = sendOrderData(formatOrderText(order));
-    setSentToTelegram(sent);
 
     cart.clearCart();
     setLastOrder(order);
@@ -227,23 +202,13 @@ export default function App() {
             totalPrice={cart.totalPrice}
             onUpdateQuantity={cart.updateQuantity}
             onRemove={cart.removeItem}
-            onCheckout={() => navigate('checkout')}
-          />
-        )}
-
-        {screen === 'checkout' && (
-          <CheckoutForm
-            totalPrice={cart.totalPrice}
-            itemCount={cart.totalItems}
-            defaultName={user ? `${user.first_name}${user.last_name ? ' ' + user.last_name : ''}` : ''}
-            onSubmit={handleSubmitOrder}
+            onCheckout={handleSubmitOrder}
           />
         )}
 
         {screen === 'success' && lastOrder && (
           <OrderSuccess
             order={lastOrder}
-            sentToTelegram={sentToTelegram}
             onContinue={() => navigate('catalog')}
           />
         )}

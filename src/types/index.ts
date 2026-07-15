@@ -46,8 +46,6 @@ export interface CartItem {
 }
 
 export interface OrderForm {
-  name: string;
-  phone: string;
   comment: string;
 }
 
@@ -66,7 +64,7 @@ export interface Order {
   telegramUser?: TelegramWebAppUser;
 }
 
-export type Screen = 'home' | 'catalog' | 'product' | 'cart' | 'checkout' | 'success';
+export type Screen = 'home' | 'catalog' | 'product' | 'cart' | 'success';
 
 export type CatalogContext =
   | { mode: 'all' }

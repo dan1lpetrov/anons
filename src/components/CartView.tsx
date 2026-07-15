@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { formatPrice } from '../utils/format';
 import type { useCart } from '../hooks/useCart';
 
@@ -8,7 +9,7 @@ interface CartViewProps {
   totalPrice: number;
   onUpdateQuantity: (key: string, quantity: number) => void;
   onRemove: (key: string) => void;
-  onCheckout: () => void;
+  onCheckout: (comment: string) => void;
 }
 
 export function CartView({
@@ -18,6 +19,8 @@ export function CartView({
   onRemove,
   onCheckout,
 }: CartViewProps) {
+  const [comment, setComment] = useState('');
+
   if (items.length === 0) {
     return (
       <div className="empty-state">
@@ -76,10 +79,17 @@ export function CartView({
           <span>Разом</span>
           <strong>{formatPrice(totalPrice)}</strong>
         </div>
-        <p className="cart-summary__note">
-          Оплата не проводиться тут. Після оформлення ви отримаєте список товарів для ручного викупу на сайтах-джерелах.
-        </p>
-        <button type="button" className="btn-primary btn-full" onClick={onCheckout}>
+        <div className="form-field cart-comment-field">
+          <label htmlFor="comment">Коментар</label>
+          <textarea
+            id="comment"
+            placeholder="Додаткові побажання (необов'язково)"
+            rows={3}
+            value={comment}
+            onChange={(event) => setComment(event.target.value)}
+          />
+        </div>
+        <button type="button" className="btn-primary btn-full" onClick={() => onCheckout(comment.trim())}>
           Оформити замовлення
         </button>
       </div>

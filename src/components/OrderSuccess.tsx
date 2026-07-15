@@ -3,11 +3,10 @@ import { formatPrice } from '../utils/format';
 
 interface OrderSuccessProps {
   order: Order;
-  sentToTelegram: boolean;
   onContinue: () => void;
 }
 
-export function OrderSuccess({ order, sentToTelegram, onContinue }: OrderSuccessProps) {
+export function OrderSuccess({ order, onContinue }: OrderSuccessProps) {
   return (
     <div className="success-view">
       <div className="success-icon">✓</div>
@@ -19,15 +18,21 @@ export function OrderSuccess({ order, sentToTelegram, onContinue }: OrderSuccess
         <p>{order.items.length} позицій у замовленні</p>
       </div>
 
-      <ul className="success-actions-list">
-        <li>📄 Txt-файл завантажено на ваш пристрій</li>
-        <li>💾 Замовлення збережено локально</li>
-        {sentToTelegram && <li>📨 Дані надіслано в Telegram-бот</li>}
+      <h3 className="success-order-title">Ваше замовлення</h3>
+      <ul className="success-order-list">
+        {order.items.map((item) => (
+          <li key={`${item.product.id}-${item.size}-${item.color.id}`}>
+            <img src={item.product.image} alt={item.product.name} />
+            <div>
+              <strong>{item.product.name}</strong>
+              <span>{item.color.name} · {item.size} · {item.quantity} шт.</span>
+            </div>
+            <b>{formatPrice(item.lineTotal)}</b>
+          </li>
+        ))}
       </ul>
 
-      <p className="success-note">
-        Перевірте папку «Завантаження» для файлу <code>order-{order.id}.txt</code>
-      </p>
+      <p className="success-note">Дякуємо! Ми отримали ваше замовлення.</p>
 
       <button type="button" className="btn-primary btn-full" onClick={onContinue}>
         Повернутись до каталогу

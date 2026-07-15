@@ -9,12 +9,10 @@ export function formatOrderText(order: Order): string {
     `Номер:     ${order.id}`,
     `Дата:      ${new Date(order.createdAt).toLocaleString('uk-UA')}`,
     '',
-    '── Клієнт ──────────────────────────────',
-    `Ім'я:      ${order.customer.name}`,
-    `Телефон:   ${order.customer.phone}`,
   ];
 
   if (order.customer.comment) {
+    lines.push('── Коментар ────────────────────────────');
     lines.push(`Коментар:  ${order.customer.comment}`);
   }
 
@@ -52,19 +50,6 @@ export function formatOrderText(order: Order): string {
   lines.push('═══════════════════════════════════════');
 
   return lines.join('\n');
-}
-
-export function downloadOrderTxt(order: Order): void {
-  const content = formatOrderText(order);
-  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `order-${order.id}.txt`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
 }
 
 export function saveOrderToLocalStorage(order: Order): void {

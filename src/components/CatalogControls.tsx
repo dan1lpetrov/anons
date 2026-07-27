@@ -28,6 +28,7 @@ interface CatalogControlsProps {
   onFiltersChange: (filters: CatalogFilters) => void;
   onSortChange: (sort: SortOption) => void;
   onReset: () => void;
+  children: ReactNode;
 }
 
 const sortLabels: Record<SortOption, string> = {
@@ -36,8 +37,8 @@ const sortLabels: Record<SortOption, string> = {
   'price-asc': 'Від дешевших',
 };
 
-export function CatalogControls({ filters, sort, sizes, colors, brands, resultCount, onFiltersChange, onSortChange, onReset }: CatalogControlsProps) {
-  const [panel, setPanel] = useState<'filters' | 'sort' | null>(null);
+export function CatalogControls({ filters, sort, sizes, colors, brands, resultCount, onFiltersChange, onSortChange, onReset, children }: CatalogControlsProps) {
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const activeCount = filters.sizes.length + filters.colors.length + filters.brands.length;
 
   const toggle = (field: 'sizes' | 'colors' | 'brands', value: string) => {
@@ -45,54 +46,86 @@ export function CatalogControls({ filters, sort, sizes, colors, brands, resultCo
     onFiltersChange({ ...filters, [field]: values.includes(value) ? values.filter((item) => item !== value) : [...values, value] } as CatalogFilters);
   };
 
+  const filterGroups = (
+    <>
+      <FilterGroup title="Бренд">
+        {brands.map((brand) => <button key={brand.id} type="button" className={`filter-chip ${filters.brands.includes(brand.id) ? 'active' : ''}`} onClick={() => toggle('brands', brand.id)}>{brand.name}</button>)}
+      </FilterGroup>
+      <FilterGroup title="Розмір">
+        {sizes.map((size) => <button key={size} type="button" className={`filter-chip filter-chip--size ${filters.sizes.includes(size) ? 'active' : ''}`} onClick={() => toggle('sizes', size)}>{size}</button>)}
+      </FilterGroup>
+      <FilterGroup title="Колір">
+        {colors.map((color) => <button key={color.id} type="button" className={`filter-chip filter-chip--color ${filters.colors.includes(color.id) ? 'active' : ''}`} onClick={() => toggle('colors', color.id)}><i style={{ backgroundColor: color.hex }} aria-hidden="true" />{color.name}</button>)}
+      </FilterGroup>
+    </>
+  );
+
+  const sortSelect = (
+    <select
+      className="sort-select"
+      aria-label="Сортування"
+      value={sort}
+      onChange={(event) => onSortChange(event.target.value as SortOption)}
+    >
+      {(Object.keys(sortLabels) as SortOption[]).map((option) => (
+        <option key={option} value={option}>{sortLabels[option]}</option>
+      ))}
+    </select>
+  );
+
   return (
-    <section className="catalog-controls" aria-label="Керування каталогом">
-      <div className="catalog-toolbar">
-        <button className="toolbar-button" type="button" onClick={() => setPanel('filters')}>
-          <span aria-hidden="true">☷</span> Фільтри
-          {activeCount > 0 && <b>{activeCount}</b>}
-        </button>
-        <button className="toolbar-button" type="button" onClick={() => setPanel('sort')}>
-          <span aria-hidden="true">↕</span> Сортувати
-        </button>
-      </div>
-      <div className="catalog-results">
-        <span>Знайдено <strong>{resultCount}</strong> товарів</span>
-        {sort !== 'recommended' && <span className="sort-summary">{sortLabels[sort]}</span>}
-      </div>
-
-      {panel && (
-        <div className="sheet-backdrop" role="presentation" onClick={() => setPanel(null)}>
-          <section className="catalog-sheet" role="dialog" aria-modal="true" aria-label={panel === 'filters' ? 'Фільтри' : 'Сортування'} onClick={(event) => event.stopPropagation()}>
-            <div className="sheet-handle" />
-            <header className="sheet-header">
-              <h2>{panel === 'filters' ? 'Фільтри' : 'Сортування'}</h2>
-              <button type="button" aria-label="Закрити" onClick={() => setPanel(null)}>×</button>
-            </header>
-
-            {panel === 'filters' ? (
-              <div className="sheet-content">
-                <FilterGroup title="Бренд">
-                  {brands.map((brand) => <button key={brand.id} type="button" className={`filter-chip ${filters.brands.includes(brand.id) ? 'active' : ''}`} onClick={() => toggle('brands', brand.id)}>{brand.name}</button>)}
-                </FilterGroup>
-                <FilterGroup title="Розмір">
-                  {sizes.map((size) => <button key={size} type="button" className={`filter-chip filter-chip--size ${filters.sizes.includes(size) ? 'active' : ''}`} onClick={() => toggle('sizes', size)}>{size}</button>)}
-                </FilterGroup>
-                <FilterGroup title="Колір">
-                  {colors.map((color) => <button key={color.id} type="button" className={`filter-chip filter-chip--color ${filters.colors.includes(color.id) ? 'active' : ''}`} onClick={() => toggle('colors', color.id)}><i style={{ backgroundColor: color.hex }} aria-hidden="true" />{color.name}</button>)}
-                </FilterGroup>
-              </div>
-            ) : (
-              <div className="sort-options">
-                {(Object.keys(sortLabels) as SortOption[]).map((option) => <button key={option} className={`sort-option ${sort === option ? 'active' : ''}`} type="button" onClick={() => { onSortChange(option); setPanel(null); }}><span>{sortLabels[option]}</span><i aria-hidden="true">✓</i></button>)}
-              </div>
-            )}
-
-            {panel === 'filters' && <footer className="sheet-footer"><button type="button" className="sheet-reset" onClick={onReset}>Скинути</button><button type="button" className="btn-primary sheet-apply" onClick={() => setPanel(null)}>Показати {resultCount} товарів</button></footer>}
-          </section>
+    <>
+      <aside className="catalog-sidebar" aria-label="Фільтри та сортування">
+        <div className="catalog-sidebar__section">
+          <h3>Сортування</h3>
+          {sortSelect}
         </div>
-      )}
-    </section>
+        <div className="catalog-sidebar__section">
+          <div className="catalog-sidebar__header">
+            <h2>Фільтри</h2>
+            {activeCount > 0 && <button type="button" className="sheet-reset" onClick={onReset}>Скинути</button>}
+          </div>
+          {filterGroups}
+        </div>
+      </aside>
+
+      <div className="catalog-content">
+        <div className="catalog-toolbar-wrap">
+          <div className="catalog-toolbar">
+            <button className="toolbar-button" type="button" onClick={() => setFiltersOpen(true)}>
+              <span aria-hidden="true">☷</span> Фільтри
+              {activeCount > 0 && <b>{activeCount}</b>}
+            </button>
+            {sortSelect}
+          </div>
+          <div className="catalog-results">
+            <span>Знайдено <strong>{resultCount}</strong> товарів</span>
+            {sort !== 'recommended' && <span className="sort-summary">{sortLabels[sort]}</span>}
+          </div>
+
+          {filtersOpen && (
+            <div className="sheet-backdrop" role="presentation" onClick={() => setFiltersOpen(false)}>
+              <section className="catalog-sheet" role="dialog" aria-modal="true" aria-label="Фільтри" onClick={(event) => event.stopPropagation()}>
+                <div className="sheet-handle" />
+                <header className="sheet-header">
+                  <h2>Фільтри</h2>
+                  <button type="button" aria-label="Закрити" onClick={() => setFiltersOpen(false)}>×</button>
+                </header>
+
+                <div className="sheet-content">{filterGroups}</div>
+
+                <footer className="sheet-footer">
+                  <button type="button" className="sheet-reset" onClick={onReset}>Скинути</button>
+                  <button type="button" className="btn-primary sheet-apply" onClick={() => setFiltersOpen(false)}>Показати {resultCount} товарів</button>
+                </footer>
+              </section>
+            </div>
+          )}
+        </div>
+
+        {children}
+      </div>
+    </>
   );
 }
 

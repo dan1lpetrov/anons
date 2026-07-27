@@ -169,26 +169,29 @@ export default function App() {
               Розпродажі одягу з популярних магазинів. Оберіть товар — ми сформуємо замовлення для ручного викупу.
             </p>
             <CategoryFilter active={category} onChange={setCategory} />
-            <CatalogControls
-              filters={filters}
-              sort={sort}
-              sizes={getAvailableSizes(selectableProducts)}
-              colors={getAvailableColors(selectableProducts)}
-              brands={sales}
-              resultCount={filteredProducts.length}
-              onFiltersChange={setFilters}
-              onSortChange={setSort}
-              onReset={resetFilters}
-            />
-            {filteredProducts.length ? (
-              <div className="product-grid">
-                {filteredProducts.map((product) => (
-                  <ProductCard key={product.id} product={product} onClick={() => openProduct(product.id)} />
-                ))}
-              </div>
-            ) : (
-              <div className="empty-state"><span className="empty-state__icon">🔎</span><h2>Нічого не знайдено</h2><p>Спробуйте змінити параметри пошуку або фільтри.</p></div>
-            )}
+            <div className="catalog-layout">
+              <CatalogControls
+                filters={filters}
+                sort={sort}
+                sizes={getAvailableSizes(selectableProducts)}
+                colors={getAvailableColors(selectableProducts)}
+                brands={sales}
+                resultCount={filteredProducts.length}
+                onFiltersChange={setFilters}
+                onSortChange={setSort}
+                onReset={resetFilters}
+              >
+                {filteredProducts.length ? (
+                  <div className="product-grid">
+                    {filteredProducts.map((product) => (
+                      <ProductCard key={product.id} product={product} onClick={() => openProduct(product.id)} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="empty-state"><span className="empty-state__icon">🔎</span><h2>Нічого не знайдено</h2><p>Спробуйте змінити параметри пошуку або фільтри.</p></div>
+                )}
+              </CatalogControls>
+            </div>
           </>
         )}
 

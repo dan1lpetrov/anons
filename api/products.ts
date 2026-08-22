@@ -37,12 +37,16 @@ async function handlePost(req: VercelRequest, res: VercelResponse) {
   const body = req.body ?? {};
   const products = body.products;
   const endDate = body.endDate ?? null;
+  const mode = body.mode === 'append' ? 'append' : 'replace';
 
   if (!Array.isArray(products) || products.length === 0) {
     return res.status(400).json({ error: 'products має бути непорожнім масивом товарів' });
   }
   if (endDate !== null && typeof endDate !== 'string') {
     return res.status(400).json({ error: 'endDate має бути рядком дати або null' });
+  }
+  if (mode === 'append' && endDate !== null) {
+    return res.status(400).json({ error: 'endDate можна передавати лише в першому батчі (mode: replace)' });
   }
 
   for (const p of products) {
@@ -65,7 +69,9 @@ async function handlePost(req: VercelRequest, res: VercelResponse) {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
-    await client.query('TRUNCATE TABLE products');
+    if (mode === 'replace') {
+      await client.query('TRUNCATE TABLE products');
+    }
 
     const values: unknown[] = [];
     const rows = products.map((p, i) => {

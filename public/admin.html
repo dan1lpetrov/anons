@@ -417,6 +417,26 @@
     }
   });
 
+  // Vercel обмежує тіло запиту ~4.5 MB — дробимо великі заливки на батчі.
+  const UPLOAD_BATCH_MAX_BYTES = 3_500_000;
+
+  function chunkProductsForUpload(products) {
+    const batches = [];
+    let current = [];
+    for (const product of products) {
+      const trial = current.concat(product);
+      const bytes = JSON.stringify({ products: trial, mode: 'replace' }).length;
+      if (current.length > 0 && bytes > UPLOAD_BATCH_MAX_BYTES) {
+        batches.push(current);
+        current = [product];
+      } else {
+        current = trial;
+      }
+    }
+    if (current.length > 0) batches.push(current);
+    return batches;
+  }
+
   uploadBtn.addEventListener('click', async () => {
     let parsed;
     try {
@@ -426,18 +446,28 @@
       return;
     }
 
+    const batches = chunkProductsForUpload(parsed);
+    const endDate = endDateInput.value || null;
+
     uploadBtn.disabled = true;
-    setStatus(statusEl, 'pending', 'Заливаю...');
     try {
-      const res = await fetch('/api/products', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ products: parsed, endDate: endDateInput.value || null }),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-      setStatus(statusEl, 'ok', `Готово! Залито ${body.count} товар(ів). Онови сайт, щоб побачити зміни.`);
+      for (let i = 0; i < batches.length; i++) {
+        const batchLabel = batches.length > 1 ? ` (${i + 1}/${batches.length})` : '';
+        setStatus(statusEl, 'pending', `Заливаю...${batchLabel}`);
+        const res = await fetch('/api/products', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            products: batches[i],
+            mode: i === 0 ? 'replace' : 'append',
+            endDate: i === 0 ? endDate : null,
+          }),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      setStatus(statusEl, 'ok', `Готово! Залито ${parsed.length} товар(ів). Онови сайт, щоб побачити зміни.`);
       loadSales();
     } catch (err) {
       setStatus(statusEl, 'err', 'Помилка: ' + err.message);

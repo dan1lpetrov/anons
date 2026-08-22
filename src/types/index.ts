@@ -19,7 +19,9 @@ export interface Sale {
 export interface ProductColor {
   id: string;
   name: string;
-  hex: string;
+  thumbnail: string;
+  images: string[];
+  sizes: string[];
 }
 
 export interface Product {
@@ -32,6 +34,7 @@ export interface Product {
   saleId: SaleId;
   sourceName: string;
   sourceUrl: string;
+  productUrl: string;
   image: string;
   sizes: string[];
   colors: ProductColor[];
@@ -76,6 +79,5 @@ export type SortOption = 'recommended' | 'price-desc' | 'price-asc';
 export interface CatalogFilters {
   search: string;
   sizes: string[];
-  colors: string[];
   brands: SaleId[];
 }

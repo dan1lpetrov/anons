@@ -22,7 +22,7 @@ export function OrderSuccess({ order, onContinue }: OrderSuccessProps) {
       <ul className="success-order-list">
         {order.items.map((item) => (
           <li key={`${item.product.id}-${item.size}-${item.color.id}`}>
-            <img src={item.product.image} alt={item.product.name} />
+            <img src={item.color.images[0] ?? item.product.image} alt={item.product.name} />
             <div>
               <strong>{item.product.name}</strong>
               <span>{item.color.name} · {item.size} · {item.quantity} шт.</span>

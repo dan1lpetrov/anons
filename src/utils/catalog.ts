@@ -2,9 +2,9 @@ import type {
   CatalogContext,
   CatalogFilters,
   Product,
-  ProductColor,
   SortOption,
 } from '../types';
+import { sortSizes } from './sizes';
 
 function matchesContext(product: Product, context: CatalogContext): boolean {
   if (context.mode === 'all') return true;
@@ -26,11 +26,6 @@ function matchesSizes(product: Product, sizes: string[]): boolean {
   return product.sizes.some((s) => sizes.includes(s));
 }
 
-function matchesColors(product: Product, colorIds: string[]): boolean {
-  if (colorIds.length === 0) return true;
-  return product.colors.some((c) => colorIds.includes(c.id));
-}
-
 function matchesBrands(product: Product, brands: string[]): boolean {
   if (brands.length === 0) return true;
   return brands.includes(product.saleId);
@@ -46,7 +41,6 @@ export function filterProducts(
       matchesContext(p, context) &&
       matchesSearch(p, filters.search) &&
       matchesSizes(p, filters.sizes) &&
-      matchesColors(p, filters.colors) &&
       matchesBrands(p, filters.brands),
   );
 }
@@ -73,29 +67,11 @@ export function filterAndSortProducts(
 }
 
 export function getAvailableSizes(products: Product[]): string[] {
-  const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'One Size'];
-  const numeric = ['28', '30', '32', '34', '36', '39', '40', '41', '42', '43', '44'];
   const all = new Set<string>();
   products.forEach((p) => p.sizes.forEach((s) => all.add(s)));
-
-  const ordered = [
-    ...sizeOrder.filter((s) => all.has(s)),
-    ...numeric.filter((s) => all.has(s)),
-    ...[...all].filter((s) => !sizeOrder.includes(s) && !numeric.includes(s)).sort(),
-  ];
-  return ordered;
-}
-
-export function getAvailableColors(products: Product[]): ProductColor[] {
-  const map = new Map<string, ProductColor>();
-  products.forEach((p) => {
-    p.colors.forEach((c) => {
-      if (!map.has(c.id)) map.set(c.id, c);
-    });
-  });
-  return [...map.values()];
+  return sortSizes([...all]);
 }
 
 export function countActiveFilters(filters: CatalogFilters): number {
-  return filters.sizes.length + filters.colors.length + filters.brands.length;
+  return filters.sizes.length + filters.brands.length;
 }

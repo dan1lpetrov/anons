@@ -1,5 +1,5 @@
 import { useState, type ChangeEvent, type ReactNode } from 'react';
-import type { CatalogFilters, ProductColor, Sale, SortOption } from '../types';
+import type { CatalogFilters, Sale, SortOption } from '../types';
 
 interface SearchProps {
   value: string;
@@ -22,7 +22,6 @@ interface CatalogControlsProps {
   filters: CatalogFilters;
   sort: SortOption;
   sizes: string[];
-  colors: ProductColor[];
   brands: Sale[];
   resultCount: number;
   onFiltersChange: (filters: CatalogFilters) => void;
@@ -37,11 +36,11 @@ const sortLabels: Record<SortOption, string> = {
   'price-asc': 'Від дешевших',
 };
 
-export function CatalogControls({ filters, sort, sizes, colors, brands, resultCount, onFiltersChange, onSortChange, onReset, children }: CatalogControlsProps) {
+export function CatalogControls({ filters, sort, sizes, brands, resultCount, onFiltersChange, onSortChange, onReset, children }: CatalogControlsProps) {
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const activeCount = filters.sizes.length + filters.colors.length + filters.brands.length;
+  const activeCount = filters.sizes.length + filters.brands.length;
 
-  const toggle = (field: 'sizes' | 'colors' | 'brands', value: string) => {
+  const toggle = (field: 'sizes' | 'brands', value: string) => {
     const values = filters[field] as string[];
     onFiltersChange({ ...filters, [field]: values.includes(value) ? values.filter((item) => item !== value) : [...values, value] } as CatalogFilters);
   };
@@ -53,9 +52,6 @@ export function CatalogControls({ filters, sort, sizes, colors, brands, resultCo
       </FilterGroup>
       <FilterGroup title="Розмір">
         {sizes.map((size) => <button key={size} type="button" className={`filter-chip filter-chip--size ${filters.sizes.includes(size) ? 'active' : ''}`} onClick={() => toggle('sizes', size)}>{size}</button>)}
-      </FilterGroup>
-      <FilterGroup title="Колір">
-        {colors.map((color) => <button key={color.id} type="button" className={`filter-chip filter-chip--color ${filters.colors.includes(color.id) ? 'active' : ''}`} onClick={() => toggle('colors', color.id)}><i style={{ backgroundColor: color.hex }} aria-hidden="true" />{color.name}</button>)}
       </FilterGroup>
     </>
   );

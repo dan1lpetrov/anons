@@ -36,7 +36,7 @@ export function CartView({
       <ul className="cart-list">
         {items.map(({ key, product, color, item, lineTotal }) => (
           <li key={key} className="cart-item">
-            <img src={product.image} alt={product.name} className="cart-item__thumb" />
+            <img src={color.images[0] ?? product.image} alt={product.name} className="cart-item__thumb" />
             <div className="cart-item__info">
               <h3>{product.name}</h3>
               <p className="cart-item__meta">

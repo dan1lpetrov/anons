@@ -1,5 +1,5 @@
 import type { Product } from '../types';
-import { discountPercent, formatPrice } from '../utils/format';
+import { discountPercent, formatPrice, pluralizeUk } from '../utils/format';
 
 interface ProductCardProps {
   product: Product;
@@ -26,9 +26,11 @@ export function ProductCard({ product, onClick }: ProductCardProps) {
         </div>
         <div className="product-card__meta">
           {product.sizes.length > 1 && (
-            <span>{product.sizes.length} розмірів</span>
+            <span>{product.sizes.length} {pluralizeUk(product.sizes.length, ['розмір', 'розміри', 'розмірів'])}</span>
           )}
-          <span>{product.colors.length} {product.colors.length === 1 ? 'колір' : 'кольори'}</span>
+          {product.colors.length > 1 && (
+            <span>{product.colors.length} {pluralizeUk(product.colors.length, ['колір', 'кольори', 'кольорів'])}</span>
+          )}
         </div>
       </div>
     </button>

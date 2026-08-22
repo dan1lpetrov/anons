@@ -6,12 +6,12 @@ import { Header } from './components/Header';
 import { OrderSuccess } from './components/OrderSuccess';
 import { ProductCard } from './components/ProductCard';
 import { ProductDetail } from './components/ProductDetail';
-import { products } from './data/products';
+import { products as seedProducts } from './data/products';
 import { sales } from './data/sales';
 import { useCart } from './hooks/useCart';
 import { useTelegram } from './hooks/useTelegram';
-import type { CatalogFilters, CategoryId, Order, Screen, SortOption } from './types';
-import { filterAndSortProducts, getAvailableColors, getAvailableSizes } from './utils/catalog';
+import type { CatalogFilters, CategoryId, Order, Product, Screen, SortOption } from './types';
+import { filterAndSortProducts, getAvailableSizes } from './utils/catalog';
 import {
   createOrderId,
   saveOrderToLocalStorage,
@@ -27,18 +27,30 @@ const SCREEN_TITLES: Record<Screen, string> = {
 
 export default function App() {
   const { tg, user, haptic, showAlert } = useTelegram();
-  const cart = useCart();
+  const [products, setProducts] = useState<Product[]>(seedProducts);
+  const cart = useCart(products);
 
   const [screen, setScreen] = useState<Screen>('catalog');
   const [category, setCategory] = useState<CategoryId | 'all'>('all');
-  const [filters, setFilters] = useState<CatalogFilters>({ search: '', sizes: [], colors: [], brands: [] });
+  const [filters, setFilters] = useState<CatalogFilters>({ search: '', sizes: [], brands: [] });
   const [sort, setSort] = useState<SortOption>('recommended');
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
 
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/products')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: unknown) => {
+        if (!cancelled && Array.isArray(data) && data.length > 0) setProducts(data as Product[]);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
   const selectedProduct = useMemo(
     () => products.find((p) => p.id === selectedProductId),
-    [selectedProductId],
+    [products, selectedProductId],
   );
 
   const catalogContext = useMemo(
@@ -47,27 +59,40 @@ export default function App() {
   );
   const filteredProducts = useMemo(
     () => filterAndSortProducts(products, catalogContext, filters, sort),
-    [catalogContext, filters, sort],
+    [products, catalogContext, filters, sort],
   );
   const selectableProducts = useMemo(
     () => category === 'all' ? products : products.filter((product) => product.categoryId === category),
-    [category],
+    [products, category],
   );
   const resetFilters = () => {
-    setFilters({ search: '', sizes: [], colors: [], brands: [] });
+    setFilters({ search: '', sizes: [], brands: [] });
     setSort('recommended');
   };
 
-  const navigate = useCallback((next: Screen) => {
+  const navigate = useCallback((next: Screen, productId?: string | null) => {
     haptic('light');
     setScreen(next);
-  }, [haptic]);
+    if (productId !== undefined) setSelectedProductId(productId);
+    window.history.pushState({ screen: next, productId: productId ?? selectedProductId }, '');
+  }, [haptic, selectedProductId]);
 
   const goBack = useCallback(() => {
-    if (screen === 'product') navigate('catalog');
-    else if (screen === 'cart') navigate('catalog');
-    else if (screen === 'success') navigate('catalog');
-  }, [screen, navigate]);
+    window.history.back();
+  }, []);
+
+  useEffect(() => {
+    window.history.replaceState({ screen: 'catalog', productId: null }, '');
+
+    const handlePopState = (event: PopStateEvent) => {
+      const state = event.state as { screen: Screen; productId: string | null } | null;
+      setScreen(state?.screen ?? 'catalog');
+      setSelectedProductId(state?.productId ?? null);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   useEffect(() => {
     if (!tg) return;
@@ -115,8 +140,7 @@ export default function App() {
   }, [tg, screen, goBack]);
 
   const openProduct = (id: string) => {
-    setSelectedProductId(id);
-    navigate('product');
+    navigate('product', id);
   };
 
   const handleAddToCart = (size: string, colorId: string, quantity: number) => {
@@ -174,7 +198,6 @@ export default function App() {
                 filters={filters}
                 sort={sort}
                 sizes={getAvailableSizes(selectableProducts)}
-                colors={getAvailableColors(selectableProducts)}
                 brands={sales}
                 resultCount={filteredProducts.length}
                 onFiltersChange={setFilters}
@@ -196,7 +219,7 @@ export default function App() {
         )}
 
         {screen === 'product' && selectedProduct && (
-          <ProductDetail product={selectedProduct} onAddToCart={handleAddToCart} onBack={() => navigate('catalog')} />
+          <ProductDetail product={selectedProduct} onAddToCart={handleAddToCart} onBack={goBack} />
         )}
 
         {screen === 'cart' && (

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { getProductById } from '../data/products';
 import type { CartItem, Product, ProductColor } from '../types';
 
 const CART_KEY = 'anons-cart';
@@ -17,8 +16,13 @@ function cartItemKey(item: Pick<CartItem, 'productId' | 'size' | 'colorId'>) {
   return `${item.productId}:${item.size}:${item.colorId}`;
 }
 
-export function useCart() {
+export function useCart(products: Product[]) {
   const [items, setItems] = useState<CartItem[]>(loadCart);
+
+  const getProductById = useCallback(
+    (id: string) => products.find((p) => p.id === id),
+    [products],
+  );
 
   useEffect(() => {
     localStorage.setItem(CART_KEY, JSON.stringify(items));
@@ -65,7 +69,7 @@ export function useCart() {
         const product = getProductById(item.productId);
         return sum + (product?.price ?? 0) * item.quantity;
       }, 0),
-    [items],
+    [items, getProductById],
   );
 
   const enrichedItems = useMemo(
@@ -91,7 +95,7 @@ export function useCart() {
         color: ProductColor;
         lineTotal: number;
       }>,
-    [items],
+    [items, getProductById],
   );
 
   return {

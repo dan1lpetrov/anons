@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Product } from '../types';
 import { discountPercent, formatPrice } from '../utils/format';
 
@@ -9,13 +9,21 @@ interface ProductDetailProps {
 }
 
 export function ProductDetail({ product, onAddToCart, onBack }: ProductDetailProps) {
-  const [size, setSize] = useState(product.sizes[0] ?? '');
   const [colorId, setColorId] = useState(product.colors[0]?.id ?? '');
+  const selectedColor = product.colors.find((c) => c.id === colorId) ?? product.colors[0];
+
+  const [size, setSize] = useState(selectedColor?.sizes[0] ?? '');
+  const [activeImage, setActiveImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
 
+  useEffect(() => {
+    setSize(selectedColor?.sizes[0] ?? '');
+    setActiveImage(0);
+  }, [colorId, selectedColor]);
+
   const discount = discountPercent(product.price, product.originalPrice);
-  const selectedColor = product.colors.find((c) => c.id === colorId);
+  const images = selectedColor?.images.length ? selectedColor.images : [product.image];
 
   const handleAdd = () => {
     if (!size || !colorId) return;
@@ -33,14 +41,36 @@ export function ProductDetail({ product, onAddToCart, onBack }: ProductDetailPro
         touchStart.current = null;
       }}
     >
-      <div className="product-detail__hero">
-        <img src={product.image} alt={product.name} />
-        {discount && <span className="product-detail__badge">−{discount}%</span>}
+      <div className="product-detail__gallery">
+        <div className="product-detail__hero">
+          <img src={images[activeImage] ?? images[0]} alt={product.name} />
+          {discount && <span className="product-detail__badge">−{discount}%</span>}
+        </div>
+
+        {images.length > 1 && (
+          <div className="product-detail__thumbs">
+            {images.map((img, index) => (
+              <button
+                key={img}
+                type="button"
+                className={`product-detail__thumb ${activeImage === index ? 'active' : ''}`}
+                onClick={() => setActiveImage(index)}
+                aria-label={`Фото ${index + 1}`}
+              >
+                <img src={img} alt="" />
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="product-detail__content">
         <p className="product-detail__source">{product.sourceName}</p>
-        <h1 className="product-detail__title">{product.name}</h1>
+        <h1 className="product-detail__title">
+          <a href={product.productUrl} target="_blank" rel="noopener noreferrer">
+            {product.name}
+          </a>
+        </h1>
 
         <div className="product-detail__prices">
           <span className="product-detail__price">{formatPrice(product.price)}</span>
@@ -51,27 +81,30 @@ export function ProductDetail({ product, onAddToCart, onBack }: ProductDetailPro
 
         <p className="product-detail__desc">{product.description}</p>
 
-        <div className="option-group">
-          <label>Колір{selectedColor ? `: ${selectedColor.name}` : ''}</label>
-          <div className="color-options">
-            {product.colors.map((color) => (
-              <button
-                key={color.id}
-                type="button"
-                className={`color-swatch ${colorId === color.id ? 'active' : ''}`}
-                style={{ backgroundColor: color.hex }}
-                title={color.name}
-                onClick={() => setColorId(color.id)}
-                aria-label={color.name}
-              />
-            ))}
+        {product.colors.length > 1 && (
+          <div className="option-group">
+            <label>Варіант{selectedColor ? `: ${selectedColor.name}` : ''}</label>
+            <div className="color-options">
+              {product.colors.map((color) => (
+                <button
+                  key={color.id}
+                  type="button"
+                  className={`color-swatch ${colorId === color.id ? 'active' : ''}`}
+                  title={color.name}
+                  onClick={() => setColorId(color.id)}
+                  aria-label={color.name}
+                >
+                  <img src={color.thumbnail} alt="" />
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="option-group">
           <label>Розмір</label>
           <div className="size-options">
-            {product.sizes.map((s) => (
+            {(selectedColor?.sizes ?? []).map((s) => (
               <button
                 key={s}
                 type="button"

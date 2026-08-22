@@ -4,6 +4,7 @@ import { CategoryFilter } from './components/CategoryFilter';
 import { CatalogControls } from './components/CatalogControls';
 import { Header } from './components/Header';
 import { OrderSuccess } from './components/OrderSuccess';
+import { Pagination } from './components/Pagination';
 import { ProductCard } from './components/ProductCard';
 import { ProductDetail } from './components/ProductDetail';
 import { products as seedProducts } from './data/products';
@@ -25,6 +26,8 @@ const SCREEN_TITLES: Record<Screen, string> = {
   success: 'Готово',
 };
 
+const PAGE_SIZE = 24;
+
 export default function App() {
   const { tg, user, haptic, showAlert } = useTelegram();
   const [products, setProducts] = useState<Product[]>(seedProducts);
@@ -35,6 +38,7 @@ export default function App() {
   const [category, setCategory] = useState<CategoryId | 'all'>('all');
   const [filters, setFilters] = useState<CatalogFilters>({ search: '', sizes: [], brands: [] });
   const [sort, setSort] = useState<SortOption>('recommended');
+  const [page, setPage] = useState(1);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
 
@@ -65,6 +69,22 @@ export default function App() {
     () => filterAndSortProducts(products, catalogContext, filters, sort),
     [products, catalogContext, filters, sort],
   );
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedProducts = useMemo(
+    () => filteredProducts.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [filteredProducts, currentPage],
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [catalogContext, filters, sort]);
+
+  const changePage = (nextPage: number) => {
+    setPage(nextPage);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const selectableProducts = useMemo(
     () => category === 'all' ? products : products.filter((product) => product.categoryId === category),
     [products, category],
@@ -223,11 +243,14 @@ export default function App() {
                     ))}
                   </div>
                 ) : filteredProducts.length ? (
-                  <div className="product-grid">
-                    {filteredProducts.map((product) => (
-                      <ProductCard key={product.id} product={product} onClick={() => openProduct(product.id)} />
-                    ))}
-                  </div>
+                  <>
+                    <div className="product-grid">
+                      {pagedProducts.map((product) => (
+                        <ProductCard key={product.id} product={product} onClick={() => openProduct(product.id)} />
+                      ))}
+                    </div>
+                    <Pagination page={currentPage} totalPages={totalPages} onChange={changePage} />
+                  </>
                 ) : (
                   <div className="empty-state"><span className="empty-state__icon">🔎</span><h2>Нічого не знайдено</h2><p>Спробуйте змінити параметри пошуку або фільтри.</p></div>
                 )}

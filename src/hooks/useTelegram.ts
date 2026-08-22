@@ -7,6 +7,7 @@ export function useTelegram() {
     if (!tg) return;
     tg.ready();
     tg.expand();
+    tg.disableVerticalSwipes?.();
   }, [tg]);
 
   const user = tg?.initDataUnsafe?.user;

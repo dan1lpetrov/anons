@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CartView } from './components/CartView';
 import { CategoryFilter } from './components/CategoryFilter';
 import { CatalogControls } from './components/CatalogControls';
@@ -27,6 +27,12 @@ const SCREEN_TITLES: Record<Screen, string> = {
 };
 
 const PAGE_SIZE = 24;
+
+// #root (not window) is the actual scroll container: `overflow-x: hidden` on html/body/#root
+// forces overflow-y's computed value to `auto` per spec, so #root scrolls internally at 100% height.
+function getScrollContainer(): Element {
+  return document.getElementById('root') ?? document.documentElement;
+}
 
 export default function App() {
   const { tg, user, haptic, showAlert } = useTelegram();
@@ -80,10 +86,16 @@ export default function App() {
     setPage(1);
   }, [catalogContext, filters, sort]);
 
-  const changePage = (nextPage: number) => {
-    setPage(nextPage);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  const isFirstPageRender = useRef(true);
+  useEffect(() => {
+    if (isFirstPageRender.current) {
+      isFirstPageRender.current = false;
+      return;
+    }
+    getScrollContainer().scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentPage]);
+
+  const changePage = (nextPage: number) => setPage(nextPage);
 
   const selectableProducts = useMemo(
     () => category === 'all' ? products : products.filter((product) => product.categoryId === category),
@@ -95,12 +107,16 @@ export default function App() {
     setSort('recommended');
   };
 
+  const scrollPositions = useRef<Partial<Record<Screen, number>>>({});
+
   const navigate = useCallback((next: Screen, productId?: string | null) => {
+    scrollPositions.current[screen] = getScrollContainer().scrollTop;
     haptic('light');
     setScreen(next);
     if (productId !== undefined) setSelectedProductId(productId);
     window.history.pushState({ screen: next, productId: productId ?? selectedProductId }, '');
-  }, [haptic, selectedProductId]);
+    requestAnimationFrame(() => getScrollContainer().scrollTo({ top: 0, behavior: 'auto' }));
+  }, [haptic, selectedProductId, screen]);
 
   const goBack = useCallback(() => {
     window.history.back();
@@ -111,8 +127,11 @@ export default function App() {
 
     const handlePopState = (event: PopStateEvent) => {
       const state = event.state as { screen: Screen; productId: string | null } | null;
-      setScreen(state?.screen ?? 'catalog');
+      const targetScreen = state?.screen ?? 'catalog';
+      setScreen(targetScreen);
       setSelectedProductId(state?.productId ?? null);
+      const savedY = scrollPositions.current[targetScreen] ?? 0;
+      requestAnimationFrame(() => getScrollContainer().scrollTo({ top: savedY, behavior: 'auto' }));
     };
 
     window.addEventListener('popstate', handlePopState);

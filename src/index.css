@@ -709,6 +709,31 @@ img {
   font-weight: 500;
 }
 
+.skeleton-block {
+  background: linear-gradient(90deg, var(--tg-secondary-bg) 25%, var(--tg-bg, rgba(255, 255, 255, 0.15)) 50%, var(--tg-secondary-bg) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.product-card--skeleton .product-card__image-wrap {
+  border-radius: 0;
+}
+
+.product-card--skeleton .skeleton-line {
+  height: 12px;
+  margin-bottom: 8px;
+}
+
+.product-card--skeleton .skeleton-line--short {
+  width: 60%;
+}
+
 .empty-state {
   text-align: center;
   padding: 60px 20px;

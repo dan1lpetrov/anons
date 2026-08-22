@@ -28,6 +28,7 @@ const SCREEN_TITLES: Record<Screen, string> = {
 export default function App() {
   const { tg, user, haptic, showAlert } = useTelegram();
   const [products, setProducts] = useState<Product[]>(seedProducts);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const cart = useCart(products);
 
   const [screen, setScreen] = useState<Screen>('catalog');
@@ -44,7 +45,10 @@ export default function App() {
       .then((data: unknown) => {
         if (!cancelled && Array.isArray(data) && data.length > 0) setProducts(data as Product[]);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setIsLoadingProducts(false);
+      });
     return () => { cancelled = true; };
   }, []);
 
@@ -205,7 +209,20 @@ export default function App() {
                 onSortChange={setSort}
                 onReset={resetFilters}
               >
-                {filteredProducts.length ? (
+                {isLoadingProducts ? (
+                  <div className="product-grid">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <div key={i} className="product-card product-card--skeleton">
+                        <div className="product-card__image-wrap skeleton-block" />
+                        <div className="product-card__body">
+                          <div className="skeleton-block skeleton-line skeleton-line--short" />
+                          <div className="skeleton-block skeleton-line" />
+                          <div className="skeleton-block skeleton-line skeleton-line--short" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : filteredProducts.length ? (
                   <div className="product-grid">
                     {filteredProducts.map((product) => (
                       <ProductCard key={product.id} product={product} onClick={() => openProduct(product.id)} />

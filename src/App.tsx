@@ -11,7 +11,7 @@ import { sales } from './data/sales';
 import { useCart } from './hooks/useCart';
 import { useTelegram } from './hooks/useTelegram';
 import type { CatalogFilters, CategoryId, Order, Product, Screen, SortOption } from './types';
-import { filterAndSortProducts, getAvailableSizes } from './utils/catalog';
+import { filterAndSortProducts, getAvailableCategories, getAvailableSizes } from './utils/catalog';
 import {
   createOrderId,
   saveOrderToLocalStorage,
@@ -65,6 +65,7 @@ export default function App() {
     () => category === 'all' ? products : products.filter((product) => product.categoryId === category),
     [products, category],
   );
+  const availableCategories = useMemo(() => getAvailableCategories(products), [products]);
   const resetFilters = () => {
     setFilters({ search: '', sizes: [], brands: [] });
     setSort('recommended');
@@ -192,7 +193,7 @@ export default function App() {
             <p className="catalog-intro">
               Розпродажі одягу з популярних магазинів. Оберіть товар — ми сформуємо замовлення для ручного викупу.
             </p>
-            <CategoryFilter active={category} onChange={setCategory} />
+            <CategoryFilter active={category} categories={availableCategories} onChange={setCategory} />
             <div className="catalog-layout">
               <CatalogControls
                 filters={filters}

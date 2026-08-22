@@ -1,12 +1,12 @@
-import type { CategoryId } from '../types';
-import { categories } from '../data/categories';
+import type { Category, CategoryId } from '../types';
 
 interface CategoryFilterProps {
   active: CategoryId | 'all';
+  categories: Category[];
   onChange: (category: CategoryId | 'all') => void;
 }
 
-export function CategoryFilter({ active, onChange }: CategoryFilterProps) {
+export function CategoryFilter({ active, categories, onChange }: CategoryFilterProps) {
   return (
     <div className="category-filter">
       <button

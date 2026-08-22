@@ -1,4 +1,4 @@
-export type CategoryId = 'tshirts' | 'pants' | 'jackets' | 'shoes' | 'accessories';
+export type CategoryId = string;
 
 export type SaleId = 'nike' | 'adidas' | 'puma';
 

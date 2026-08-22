@@ -86,7 +86,7 @@
 <main>
   <div>
     <h1>Товари — завантаження без деплою</h1>
-    <p class="hint">Встав JSON-масив товарів (той самий формат, що й у <code>src/data/products.ts</code>) або завантаж файл — і сайт одразу підхопить нові дані. Підтримується як звичайний JSON, так і JSONL (по одному товару на рядок).</p>
+    <p class="hint">Встав JSON або JSONL зі скрапера (по одному товару на рядок) або завантаж файл — формат нормалізується автоматично, і сайт одразу підхопить нові дані.</p>
   </div>
 
   <section id="loginSection">
@@ -169,6 +169,60 @@
     return items;
   }
 
+  const SALES = {
+    nike: { name: 'Nike', url: 'https://www.nike.com/sale' },
+    adidas: { name: 'Adidas', url: 'https://www.adidas.com/outlet' },
+    puma: { name: 'Puma', url: 'https://eu.puma.com/uk/en/sports/sale' },
+  };
+
+  function normalizeProduct(raw, index) {
+    if (!raw || typeof raw !== 'object') {
+      throw new Error(`Товар №${index + 1}: не є обʼєктом.`);
+    }
+
+    // Вже в потрібному форматі — нічого не робимо
+    if (typeof raw.id === 'string' && typeof raw.name === 'string' && typeof raw.price === 'number') {
+      return raw;
+    }
+
+    // Сирий формат скрапера (product_id, title, colors[].pricing, ...)
+    const id = raw.product_id || raw.id;
+    if (!id) throw new Error(`Товар №${index + 1}: немає id/product_id.`);
+
+    const rawColors = Array.isArray(raw.colors) ? raw.colors : [];
+    const colors = rawColors.map((c, ci) => ({
+      id: c.product_id || c.id || `${id}-${ci}`,
+      name: c.name || c.product_id || `Варіант ${ci + 1}`,
+      thumbnail: c.thumbnail || raw.thumbnail || '',
+      images: Array.isArray(c.images) ? c.images : [],
+      sizes: Array.isArray(c.sizes)
+        ? c.sizes.filter((s) => s && s.available !== false).map((s) => (typeof s === 'string' ? s : s.size))
+        : [],
+    }));
+
+    const firstPricing = (rawColors[0] && rawColors[0].pricing) || {};
+    const allSizes = [...new Set(colors.flatMap((c) => c.sizes))];
+    const saleId = raw.source || raw.saleId || '';
+    const brand = SALES[saleId];
+
+    return {
+      id,
+      name: raw.title || raw.name || id,
+      description: raw.description || raw.title || '',
+      price: firstPricing.sale_price ?? raw.price ?? 0,
+      originalPrice: firstPricing.original_price ?? raw.originalPrice,
+      categoryId: raw.category || raw.categoryId || 'other',
+      saleId,
+      sourceName: raw.sourceName || (brand && brand.name) || saleId,
+      sourceUrl: raw.sourceUrl || (brand && brand.url) || '',
+      productUrl: raw.url || raw.productUrl || '',
+      image: (rawColors[0] && rawColors[0].thumbnail) || raw.image || '',
+      sizes: allSizes,
+      colors,
+      featuredRank: raw.featuredRank ?? 0,
+    };
+  }
+
   async function checkSession() {
     const params = new URLSearchParams(location.search);
     const error = params.get('error');
@@ -222,7 +276,7 @@
   uploadBtn.addEventListener('click', async () => {
     let parsed;
     try {
-      parsed = parseProductsPayload(jsonArea.value);
+      parsed = parseProductsPayload(jsonArea.value).map(normalizeProduct);
     } catch (err) {
       setStatus(statusEl, 'err', err.message || 'Невалідний JSON.');
       return;

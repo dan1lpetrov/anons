@@ -1,9 +1,11 @@
 import type {
   CatalogContext,
   CatalogFilters,
+  Category,
   Product,
   SortOption,
 } from '../types';
+import { categoryEmoji, categoryLabel } from '../data/categories';
 import { sortSizes } from './sizes';
 
 function matchesContext(product: Product, context: CatalogContext): boolean {
@@ -70,6 +72,18 @@ export function getAvailableSizes(products: Product[]): string[] {
   const all = new Set<string>();
   products.forEach((p) => p.sizes.forEach((s) => all.add(s)));
   return sortSizes([...all]);
+}
+
+export function getAvailableCategories(products: Product[]): Category[] {
+  const seen = new Set<string>();
+  const list: Category[] = [];
+  products.forEach((p) => {
+    if (!seen.has(p.categoryId)) {
+      seen.add(p.categoryId);
+      list.push({ id: p.categoryId, name: categoryLabel(p.categoryId), emoji: categoryEmoji(p.categoryId) });
+    }
+  });
+  return list.sort((a, b) => a.name.localeCompare(b.name, 'uk'));
 }
 
 export function countActiveFilters(filters: CatalogFilters): number {

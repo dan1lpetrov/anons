@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { db, ensureSchema } from './_lib/db';
-import { requireAdmin } from './_lib/session';
+import { db, ensureSchema } from './_lib/db.js';
+import { requireAdmin } from './_lib/session.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   await ensureSchema();
@@ -14,7 +14,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
 async function handleGet(res: VercelResponse) {
   try {
-    const { rows } = await db.query('SELECT data FROM products ORDER BY featured_rank ASC, id ASC');
+    const { rows } = await db.query<{ data: unknown }>(
+      'SELECT data FROM products ORDER BY featured_rank ASC, id ASC',
+    );
     res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
     return res.status(200).json(rows.map((row) => row.data));
   } catch (error) {

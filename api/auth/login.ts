@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getRedirectUri, randomState } from '../_lib/google';
+import { getRedirectUri, randomState } from '../_lib/google.js';
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
   const clientId = process.env.GOOGLE_CLIENT_ID;

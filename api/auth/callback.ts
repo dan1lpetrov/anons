@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
-import { getRedirectUri } from '../_lib/google';
-import { createSessionCookie, isAdminEmail, parseCookies } from '../_lib/session';
+import { getRedirectUri } from '../_lib/google.js';
+import { createSessionCookie, isAdminEmail, parseCookies } from '../_lib/session.js';
 
 const GOOGLE_JWKS = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'));
 

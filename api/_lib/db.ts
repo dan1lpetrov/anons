@@ -17,6 +17,14 @@ export async function ensureSchema(): Promise<void> {
             updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
           );
         `);
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS sale_windows (
+            sale_id TEXT PRIMARY KEY,
+            end_date TIMESTAMPTZ,
+            active BOOLEAN NOT NULL DEFAULT true,
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+          );
+        `);
       } finally {
         client.release();
       }

@@ -79,6 +79,20 @@
   .status.pending { display: block; background: var(--secondary-bg); color: var(--hint); }
   .account { font-size: 14px; color: var(--hint); }
   .hidden { display: none !important; }
+  .sale-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .sale-row:last-child { border-bottom: none; }
+  .sale-row__name { font-weight: 600; min-width: 90px; }
+  .sale-row__badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; }
+  .sale-row__badge.active { background: rgba(52, 199, 89, 0.15); color: #1f7a3d; }
+  .sale-row__badge.stopped { background: rgba(255, 59, 48, 0.12); color: var(--danger); }
+  .sale-row input[type="date"] { font: inherit; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--secondary-bg); color: var(--text); }
   code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--secondary-bg); padding: 1px 4px; border-radius: 4px; }
 </style>
 </head>
@@ -109,11 +123,23 @@
     <input id="file" type="file" accept="application/json,.json,.jsonl,text/plain" />
     <label for="json">Або встав JSON вручну</label>
     <textarea id="json" placeholder="[ { &quot;id&quot;: &quot;...&quot;, &quot;name&quot;: &quot;...&quot;, ... } ]"></textarea>
+    <label for="endDate">Дійсні до (необов'язково)</label>
+    <input id="endDate" type="date" />
+    <p class="hint">Якщо вказати дату — після неї товари з цього завантаження автоматично зникнуть із сайту. Порожнє поле нічого не змінює в термінах, які вже задані.</p>
     <div class="row">
       <button id="loadCurrent" class="secondary" type="button">Завантажити поточні товари</button>
       <button id="upload" class="primary" type="button">Залити на сайт</button>
     </div>
     <div id="status" class="status"></div>
+  </section>
+
+  <section id="salesSection" class="hidden">
+    <div class="row" style="justify-content: space-between;">
+      <h1 style="font-size: 15px;">Розпродажі — термін дії</h1>
+      <button id="reloadSales" class="secondary" type="button">Оновити</button>
+    </div>
+    <div id="salesList"></div>
+    <div id="salesStatus" class="status"></div>
   </section>
 </main>
 
@@ -129,6 +155,11 @@
   const uploadBtn = document.getElementById('upload');
   const loadBtn = document.getElementById('loadCurrent');
   const logoutBtn = document.getElementById('logout');
+  const endDateInput = document.getElementById('endDate');
+  const salesSection = document.getElementById('salesSection');
+  const salesList = document.getElementById('salesList');
+  const salesStatus = document.getElementById('salesStatus');
+  const reloadSalesBtn = document.getElementById('reloadSales');
 
   const ERROR_MESSAGES = {
     forbidden: 'Цей Google-акаунт не має доступу до адмінки.',
@@ -238,13 +269,92 @@
       loginSection.classList.add('hidden');
       adminSection.classList.remove('hidden');
       uploadSection.classList.remove('hidden');
+      salesSection.classList.remove('hidden');
       accountEmail.textContent = email;
+      loadSales();
     } catch {
       loginSection.classList.remove('hidden');
       adminSection.classList.add('hidden');
       uploadSection.classList.add('hidden');
+      salesSection.classList.add('hidden');
     }
   }
+
+  async function loadSales() {
+    setStatus(salesStatus, 'pending', 'Завантаження...');
+    try {
+      const res = await fetch('/api/sales', { cache: 'no-store', credentials: 'include' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      const sales = await res.json();
+      renderSales(sales);
+      salesStatus.className = 'status';
+    } catch (err) {
+      setStatus(salesStatus, 'err', 'Помилка: ' + err.message);
+    }
+  }
+
+  function renderSales(sales) {
+    salesList.innerHTML = '';
+    if (sales.length === 0) {
+      salesList.innerHTML = '<p class="hint">Ще немає жодного залитого товару.</p>';
+      return;
+    }
+
+    sales.forEach((sale) => {
+      const row = document.createElement('div');
+      row.className = 'sale-row';
+
+      const name = document.createElement('span');
+      name.className = 'sale-row__name';
+      name.textContent = sale.saleId;
+
+      const badge = document.createElement('span');
+      badge.className = 'sale-row__badge ' + (sale.active ? 'active' : 'stopped');
+      badge.textContent = sale.active ? 'Активний' : 'Зупинений';
+
+      const dateInput = document.createElement('input');
+      dateInput.type = 'date';
+      dateInput.value = sale.endDate ? sale.endDate.slice(0, 10) : '';
+
+      const saveBtn = document.createElement('button');
+      saveBtn.type = 'button';
+      saveBtn.className = 'secondary';
+      saveBtn.textContent = 'Зберегти дату';
+      saveBtn.addEventListener('click', () => saveSale(sale.saleId, dateInput.value || null, sale.active));
+
+      const toggleBtn = document.createElement('button');
+      toggleBtn.type = 'button';
+      toggleBtn.className = sale.active ? 'danger' : 'secondary';
+      toggleBtn.textContent = sale.active ? 'Зупинити розпродаж' : 'Відновити';
+      toggleBtn.addEventListener('click', () => saveSale(sale.saleId, dateInput.value || null, !sale.active));
+
+      row.append(name, badge, dateInput, saveBtn, toggleBtn);
+      salesList.appendChild(row);
+    });
+  }
+
+  async function saveSale(saleId, endDate, active) {
+    setStatus(salesStatus, 'pending', 'Збереження...');
+    try {
+      const res = await fetch('/api/sales', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ saleId, endDate, active }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      setStatus(salesStatus, 'ok', 'Збережено.');
+      loadSales();
+    } catch (err) {
+      setStatus(salesStatus, 'err', 'Помилка: ' + err.message);
+    }
+  }
+
+  reloadSalesBtn.addEventListener('click', loadSales);
 
   logoutBtn.addEventListener('click', async () => {
     await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
@@ -289,11 +399,12 @@
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(parsed),
+        body: JSON.stringify({ products: parsed, endDate: endDateInput.value || null }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
       setStatus(statusEl, 'ok', `Готово! Залито ${body.count} товар(ів). Онови сайт, щоб побачити зміни.`);
+      loadSales();
     } catch (err) {
       setStatus(statusEl, 'err', 'Помилка: ' + err.message);
     } finally {

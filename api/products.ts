@@ -14,9 +14,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
 async function handleGet(res: VercelResponse) {
   try {
-    const { rows } = await db.query<{ data: unknown }>(
-      'SELECT data FROM products ORDER BY featured_rank ASC, id ASC',
-    );
+    const { rows } = await db.query<{ data: unknown }>(`
+      SELECT p.data
+      FROM products p
+      LEFT JOIN sale_windows w ON w.sale_id = p.sale_id
+      WHERE w.active IS NOT FALSE
+        AND (w.end_date IS NULL OR w.end_date > now())
+      ORDER BY p.featured_rank ASC, p.id ASC
+    `);
     res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
     return res.status(200).json(rows.map((row) => row.data));
   } catch (error) {
@@ -29,9 +34,15 @@ async function handlePost(req: VercelRequest, res: VercelResponse) {
   const email = await requireAdmin(req, res);
   if (!email) return; // requireAdmin already sent the 401 response
 
-  const products = req.body;
+  const body = req.body ?? {};
+  const products = body.products;
+  const endDate = body.endDate ?? null;
+
   if (!Array.isArray(products) || products.length === 0) {
-    return res.status(400).json({ error: 'Тіло запиту має бути непорожнім масивом товарів' });
+    return res.status(400).json({ error: 'products має бути непорожнім масивом товарів' });
+  }
+  if (endDate !== null && typeof endDate !== 'string') {
+    return res.status(400).json({ error: 'endDate має бути рядком дати або null' });
   }
 
   for (const p of products) {
@@ -66,6 +77,18 @@ async function handlePost(req: VercelRequest, res: VercelResponse) {
       `INSERT INTO products (id, category_id, sale_id, featured_rank, data) VALUES ${rows.join(',')}`,
       values,
     );
+
+    if (endDate) {
+      const saleIds = [...new Set(products.map((p) => p.saleId as string))];
+      for (const saleId of saleIds) {
+        await client.query(
+          `INSERT INTO sale_windows (sale_id, end_date, active, updated_at)
+           VALUES ($1, $2, true, now())
+           ON CONFLICT (sale_id) DO UPDATE SET end_date = $2, active = true, updated_at = now()`,
+          [saleId, endDate],
+        );
+      }
+    }
 
     await client.query('COMMIT');
     return res.status(200).json({ ok: true, count: products.length, uploadedBy: email });

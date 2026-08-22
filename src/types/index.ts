@@ -22,6 +22,8 @@ export interface ProductColor {
   thumbnail: string;
   images: string[];
   sizes: string[];
+  price?: number;
+  originalPrice?: number;
 }
 
 export interface Product {

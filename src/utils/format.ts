@@ -1,3 +1,5 @@
+import type { Product, ProductColor } from '../types';
+
 export function formatPrice(price: number): string {
   return `$${price.toLocaleString('en-US')}`;
 }
@@ -5,6 +7,14 @@ export function formatPrice(price: number): string {
 export function discountPercent(price: number, originalPrice?: number): number | null {
   if (!originalPrice || originalPrice <= price) return null;
   return Math.round(((originalPrice - price) / originalPrice) * 100);
+}
+
+export function colorPrice(product: Product, color?: ProductColor): number {
+  return color?.price ?? product.price;
+}
+
+export function colorOriginalPrice(product: Product, color?: ProductColor): number | undefined {
+  return color?.originalPrice ?? product.originalPrice;
 }
 
 export function pluralizeUk(n: number, forms: [string, string, string]): string {

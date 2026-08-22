@@ -221,17 +221,28 @@
     if (!id) throw new Error(`Товар №${index + 1}: немає id/product_id.`);
 
     const rawColors = Array.isArray(raw.colors) ? raw.colors : [];
-    const colors = rawColors.map((c, ci) => ({
-      id: c.product_id || c.id || `${id}-${ci}`,
-      name: c.name || c.product_id || `Варіант ${ci + 1}`,
-      thumbnail: c.thumbnail || raw.thumbnail || '',
-      images: Array.isArray(c.images) ? c.images : [],
-      sizes: Array.isArray(c.sizes)
-        ? c.sizes.filter((s) => s && s.available !== false).map((s) => (typeof s === 'string' ? s : s.size))
-        : [],
-    }));
+    const colors = rawColors.map((c, ci) => {
+      const pricing = c.pricing || {};
+      const colorPrice = typeof pricing.sale_price === 'number' ? pricing.sale_price : undefined;
+      const colorOriginalPrice = typeof pricing.original_price === 'number' ? pricing.original_price : undefined;
+      return {
+        id: c.product_id || c.id || `${id}-${ci}`,
+        name: c.name || c.product_id || `Варіант ${ci + 1}`,
+        thumbnail: c.thumbnail || raw.thumbnail || '',
+        images: Array.isArray(c.images) ? c.images : [],
+        sizes: Array.isArray(c.sizes)
+          ? c.sizes.filter((s) => s && s.available !== false).map((s) => (typeof s === 'string' ? s : s.size))
+          : [],
+        ...(colorPrice !== undefined ? { price: colorPrice } : {}),
+        ...(colorOriginalPrice !== undefined ? { originalPrice: colorOriginalPrice } : {}),
+      };
+    });
 
-    const firstPricing = (rawColors[0] && rawColors[0].pricing) || {};
+    // Ціна товару на картці — найдешевший варіант кольору (якщо ціни різняться між кольорами).
+    const colorsWithPrice = colors.filter((c) => typeof c.price === 'number');
+    const cheapestColor = colorsWithPrice.length
+      ? colorsWithPrice.reduce((min, c) => (c.price < min.price ? c : min))
+      : null;
     const allSizes = [...new Set(colors.flatMap((c) => c.sizes))];
     const saleId = raw.source || raw.saleId || '';
     const brand = SALES[saleId];
@@ -240,8 +251,8 @@
       id,
       name: raw.title || raw.name || id,
       description: raw.description || raw.title || '',
-      price: firstPricing.sale_price ?? raw.price ?? 0,
-      originalPrice: firstPricing.original_price ?? raw.originalPrice,
+      price: (cheapestColor && cheapestColor.price) ?? raw.price ?? 0,
+      originalPrice: (cheapestColor && cheapestColor.originalPrice) ?? raw.originalPrice,
       categoryId: raw.category || raw.categoryId || 'other',
       saleId,
       sourceName: raw.sourceName || (brand && brand.name) || saleId,
@@ -331,7 +342,13 @@
       toggleBtn.textContent = sale.active ? 'Зупинити розпродаж' : 'Відновити';
       toggleBtn.addEventListener('click', () => saveSale(sale.saleId, dateInput.value || null, !sale.active));
 
-      row.append(name, badge, dateInput, saveBtn, toggleBtn);
+      const deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'danger';
+      deleteBtn.textContent = 'Видалити';
+      deleteBtn.addEventListener('click', () => deleteSale(sale.saleId));
+
+      row.append(name, badge, dateInput, saveBtn, toggleBtn, deleteBtn);
       salesList.appendChild(row);
     });
   }
@@ -348,6 +365,23 @@
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
       setStatus(salesStatus, 'ok', 'Збережено.');
+      loadSales();
+    } catch (err) {
+      setStatus(salesStatus, 'err', 'Помилка: ' + err.message);
+    }
+  }
+
+  async function deleteSale(saleId) {
+    if (!confirm(`Видалити розпродаж "${saleId}" і всі його товари? Це незворотньо.`)) return;
+    setStatus(salesStatus, 'pending', 'Видалення...');
+    try {
+      const res = await fetch(`/api/sales?saleId=${encodeURIComponent(saleId)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      setStatus(salesStatus, 'ok', `Видалено. Товарів прибрано: ${body.removedProducts ?? 0}.`);
       loadSales();
     } catch (err) {
       setStatus(salesStatus, 'err', 'Помилка: ' + err.message);

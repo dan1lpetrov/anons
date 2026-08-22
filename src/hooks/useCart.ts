@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CartItem, Product, ProductColor } from '../types';
+import { colorPrice } from '../utils/format';
 
 const CART_KEY = 'anons-cart';
 
@@ -67,7 +68,9 @@ export function useCart(products: Product[]) {
     () =>
       items.reduce((sum, item) => {
         const product = getProductById(item.productId);
-        return sum + (product?.price ?? 0) * item.quantity;
+        if (!product) return sum;
+        const color = product.colors.find((c) => c.id === item.colorId);
+        return sum + colorPrice(product, color) * item.quantity;
       }, 0),
     [items, getProductById],
   );
@@ -85,7 +88,7 @@ export function useCart(products: Product[]) {
             item,
             product,
             color,
-            lineTotal: product.price * item.quantity,
+            lineTotal: colorPrice(product, color) * item.quantity,
           };
         })
         .filter(Boolean) as Array<{

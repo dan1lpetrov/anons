@@ -16,8 +16,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'GET') return handleGet(res);
   if (req.method === 'POST') return handlePost(req, res);
+  if (req.method === 'DELETE') return handleDelete(req, res);
 
-  res.setHeader('Allow', 'GET, POST');
+  res.setHeader('Allow', 'GET, POST, DELETE');
   return res.status(405).json({ error: 'Method not allowed' });
 }
 
@@ -67,5 +68,28 @@ async function handlePost(req: VercelRequest, res: VercelResponse) {
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: 'Не вдалося зберегти розпродаж' });
+  }
+}
+
+async function handleDelete(req: VercelRequest, res: VercelResponse) {
+  const saleId = typeof req.query.saleId === 'string' ? req.query.saleId : undefined;
+
+  if (!saleId) {
+    return res.status(400).json({ error: 'saleId обовʼязковий' });
+  }
+
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    const { rowCount } = await client.query('DELETE FROM products WHERE sale_id = $1', [saleId]);
+    await client.query('DELETE FROM sale_windows WHERE sale_id = $1', [saleId]);
+    await client.query('COMMIT');
+    return res.status(200).json({ ok: true, removedProducts: rowCount });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error(error);
+    return res.status(500).json({ error: 'Не вдалося видалити розпродаж' });
+  } finally {
+    client.release();
   }
 }

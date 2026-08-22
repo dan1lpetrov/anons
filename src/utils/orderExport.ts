@@ -35,7 +35,7 @@ export function formatOrderText(order: Order): string {
     lines.push(`   Розмір:    ${entry.size}`);
     lines.push(`   Колір:     ${entry.color.name}`);
     lines.push(`   Кількість: ${entry.quantity}`);
-    lines.push(`   Ціна:      ${entry.product.price} ₴ × ${entry.quantity} = ${entry.lineTotal} ₴`);
+    lines.push(`   Ціна:      ${entry.lineTotal / entry.quantity} ₴ × ${entry.quantity} = ${entry.lineTotal} ₴`);
     lines.push(`   Джерело:   ${entry.product.sourceName}`);
     lines.push(`   Посилання: ${entry.product.sourceUrl}`);
   });

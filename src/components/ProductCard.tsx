@@ -1,5 +1,5 @@
 import type { Product } from '../types';
-import { discountPercent, formatPrice, pluralizeUk } from '../utils/format';
+import { colorOriginalPrice, colorPrice, discountPercent, formatPrice, pluralizeUk } from '../utils/format';
 
 interface ProductCardProps {
   product: Product;
@@ -7,7 +7,14 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, onClick }: ProductCardProps) {
-  const discount = discountPercent(product.price, product.originalPrice);
+  const colorPrices = product.colors.length
+    ? product.colors.map((c) => colorPrice(product, c))
+    : [product.price];
+  const minPrice = Math.min(...colorPrices);
+  const hasPriceRange = new Set(colorPrices).size > 1;
+  const cheapestColor = product.colors.find((c) => colorPrice(product, c) === minPrice);
+  const originalPrice = colorOriginalPrice(product, cheapestColor);
+  const discount = discountPercent(minPrice, originalPrice);
 
   return (
     <button type="button" className="product-card" onClick={onClick}>
@@ -19,9 +26,12 @@ export function ProductCard({ product, onClick }: ProductCardProps) {
         <p className="product-card__source">{product.sourceName}</p>
         <h3 className="product-card__name">{product.name}</h3>
         <div className="product-card__prices">
-          <span className="product-card__price">{formatPrice(product.price)}</span>
-          {product.originalPrice && (
-            <span className="product-card__original">{formatPrice(product.originalPrice)}</span>
+          <span className="product-card__price">
+            {hasPriceRange && 'від '}
+            {formatPrice(minPrice)}
+          </span>
+          {originalPrice && (
+            <span className="product-card__original">{formatPrice(originalPrice)}</span>
           )}
         </div>
         <div className="product-card__meta">

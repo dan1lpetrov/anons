@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Product } from '../types';
-import { discountPercent, formatPrice } from '../utils/format';
+import { colorOriginalPrice, colorPrice, discountPercent, formatPrice } from '../utils/format';
 
 interface ProductDetailProps {
   product: Product;
@@ -15,15 +15,29 @@ export function ProductDetail({ product, onAddToCart, onBack }: ProductDetailPro
   const [size, setSize] = useState(selectedColor?.sizes[0] ?? '');
   const [activeImage, setActiveImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
+  const [dragPx, setDragPx] = useState(0);
+  const [dragging, setDragging] = useState(false);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const galleryTouchStart = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     setSize(selectedColor?.sizes[0] ?? '');
     setActiveImage(0);
+    setDragPx(0);
+    setDragging(false);
   }, [colorId, selectedColor]);
 
-  const discount = discountPercent(product.price, product.originalPrice);
+  const price = colorPrice(product, selectedColor);
+  const originalPrice = colorOriginalPrice(product, selectedColor);
+  const discount = discountPercent(price, originalPrice);
   const images = selectedColor?.images.length ? selectedColor.images : [product.image];
+
+  const goToImage = (delta: number) => {
+    setActiveImage((prev) => {
+      const next = (prev + delta + images.length) % images.length;
+      return next;
+    });
+  };
 
   const handleAdd = () => {
     if (!size || !colorId) return;
@@ -42,9 +56,82 @@ export function ProductDetail({ product, onAddToCart, onBack }: ProductDetailPro
       }}
     >
       <div className="product-detail__gallery">
-        <div className="product-detail__hero">
-          <img src={images[activeImage] ?? images[0]} alt={product.name} />
+        <div
+          className="product-detail__hero"
+          onTouchStart={(event) => {
+            event.stopPropagation();
+            const touch = event.touches[0];
+            galleryTouchStart.current = { x: touch.clientX, y: touch.clientY };
+            setDragging(true);
+          }}
+          onTouchMove={(event) => {
+            const start = galleryTouchStart.current;
+            if (!start || images.length < 2) return;
+            const touch = event.touches[0];
+            setDragPx(touch.clientX - start.x);
+          }}
+          onTouchEnd={(event) => {
+            event.stopPropagation();
+            const start = galleryTouchStart.current;
+            galleryTouchStart.current = null;
+            setDragging(false);
+            if (!start || images.length < 2) {
+              setDragPx(0);
+              return;
+            }
+            const touch = event.changedTouches[0];
+            const dx = touch.clientX - start.x;
+            const dy = touch.clientY - start.y;
+            const width = event.currentTarget.offsetWidth || 1;
+            if (Math.abs(dx) > width * 0.15 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+              goToImage(dx < 0 ? 1 : -1);
+            }
+            setDragPx(0);
+          }}
+        >
+          <div
+            className="product-detail__track"
+            style={{
+              transform: `translate3d(calc(${-activeImage * 100}% + ${dragPx}px), 0, 0)`,
+              transition: dragging ? 'none' : 'transform 0.28s ease',
+            }}
+          >
+            {images.map((img, index) => (
+              <img
+                key={img}
+                src={img}
+                alt={index === 0 ? product.name : ''}
+                className="product-detail__slide"
+              />
+            ))}
+          </div>
           {discount && <span className="product-detail__badge">−{discount}%</span>}
+
+          {images.length > 1 && (
+            <>
+              <button
+                type="button"
+                className="product-detail__nav product-detail__nav--prev"
+                onClick={() => goToImage(-1)}
+                aria-label="Попереднє фото"
+              >
+                ‹
+              </button>
+              <button
+                type="button"
+                className="product-detail__nav product-detail__nav--next"
+                onClick={() => goToImage(1)}
+                aria-label="Наступне фото"
+              >
+                ›
+              </button>
+              <div className="product-detail__dots">
+                {images.map((img, index) => (
+                  <span key={img} className={`product-detail__dot ${activeImage === index ? 'active' : ''}`} />
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         {images.length > 1 && (
@@ -73,9 +160,9 @@ export function ProductDetail({ product, onAddToCart, onBack }: ProductDetailPro
         </h1>
 
         <div className="product-detail__prices">
-          <span className="product-detail__price">{formatPrice(product.price)}</span>
-          {product.originalPrice && (
-            <span className="product-detail__original">{formatPrice(product.originalPrice)}</span>
+          <span className="product-detail__price">{formatPrice(price)}</span>
+          {originalPrice && (
+            <span className="product-detail__original">{formatPrice(originalPrice)}</span>
           )}
         </div>
 
@@ -146,7 +233,7 @@ export function ProductDetail({ product, onAddToCart, onBack }: ProductDetailPro
         </div>
 
         <button type="button" className="btn-primary btn-full" onClick={handleAdd}>
-          Додати в кошик — {formatPrice(product.price * quantity)}
+          Додати в кошик — {formatPrice(price * quantity)}
         </button>
       </div>
     </div>

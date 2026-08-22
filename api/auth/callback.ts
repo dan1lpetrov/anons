@@ -53,7 +53,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       cookie,
       `anons_oauth_state=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax`,
     ]);
-    res.writeHead(302, { Location: '/admin.html' });
+    res.writeHead(302, { Location: '/admin' });
     return res.end();
   } catch (err) {
     console.error(err);
@@ -63,6 +63,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
 function redirectWithError(res: VercelResponse, reason: string) {
   res.setHeader('Set-Cookie', `anons_oauth_state=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax`);
-  res.writeHead(302, { Location: `/admin.html?error=${encodeURIComponent(reason)}` });
+  res.writeHead(302, { Location: `/admin?error=${encodeURIComponent(reason)}` });
   res.end();
 }

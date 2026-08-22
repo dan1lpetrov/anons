@@ -86,7 +86,7 @@
 <main>
   <div>
     <h1>Товари — завантаження без деплою</h1>
-    <p class="hint">Встав JSON-масив товарів (той самий формат, що й у <code>src/data/products.ts</code>) або завантаж файл — і сайт одразу підхопить нові дані.</p>
+    <p class="hint">Встав JSON-масив товарів (той самий формат, що й у <code>src/data/products.ts</code>) або завантаж файл — і сайт одразу підхопить нові дані. Підтримується як звичайний JSON, так і JSONL (по одному товару на рядок).</p>
   </div>
 
   <section id="loginSection">
@@ -105,8 +105,8 @@
   </section>
 
   <section id="uploadSection" class="hidden">
-    <label for="file">Файл products.json</label>
-    <input id="file" type="file" accept="application/json" />
+    <label for="file">Файл products.json або products.jsonl</label>
+    <input id="file" type="file" accept="application/json,.json,.jsonl,text/plain" />
     <label for="json">Або встав JSON вручну</label>
     <textarea id="json" placeholder="[ { &quot;id&quot;: &quot;...&quot;, &quot;name&quot;: &quot;...&quot;, ... } ]"></textarea>
     <div class="row">
@@ -140,6 +140,33 @@
   function setStatus(el, kind, text) {
     el.className = 'status ' + kind;
     el.textContent = text;
+  }
+
+  function parseProductsPayload(text) {
+    const trimmed = text.trim();
+    if (!trimmed) throw new Error('Порожній ввід.');
+
+    // Звичайний JSON: масив товарів або один товар
+    try {
+      const data = JSON.parse(trimmed);
+      if (Array.isArray(data)) return data;
+      if (data && typeof data === 'object') return [data];
+    } catch {
+      // не валідний як єдиний JSON — пробуємо JSONL нижче
+    }
+
+    // JSONL: один JSON-обʼєкт на рядок
+    const lines = trimmed.split('\n').map((l) => l.trim()).filter(Boolean);
+    const items = [];
+    lines.forEach((line, i) => {
+      try {
+        items.push(JSON.parse(line));
+      } catch {
+        throw new Error(`Невалідний JSON у рядку ${i + 1}.`);
+      }
+    });
+    if (items.length === 0) throw new Error('Не знайдено жодного товару.');
+    return items;
   }
 
   async function checkSession() {
@@ -195,9 +222,9 @@
   uploadBtn.addEventListener('click', async () => {
     let parsed;
     try {
-      parsed = JSON.parse(jsonArea.value);
-    } catch {
-      setStatus(statusEl, 'err', 'Невалідний JSON.');
+      parsed = parseProductsPayload(jsonArea.value);
+    } catch (err) {
+      setStatus(statusEl, 'err', err.message || 'Невалідний JSON.');
       return;
     }
 

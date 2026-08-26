@@ -5,7 +5,11 @@ const LETTER_ORDER: Record<string, number> = {
 function sizeRank(size: string): [number, number, string] {
   const s = size.trim();
   const upper = s.toUpperCase();
-  if (upper in LETTER_ORDER) return [0, LETTER_ORDER[upper], s];
+  if (upper in LETTER_ORDER) return [0, LETTER_ORDER[upper] * 2, s];
+  const tallMatch = /^(.+)T$/.exec(upper);
+  if (tallMatch && tallMatch[1] in LETTER_ORDER) {
+    return [0, LETTER_ORDER[tallMatch[1]] * 2 + 1, s];
+  }
   const mw = /^M\s*([\d.]+)\s*\/\s*W\s*([\d.]+)$/i.exec(s);
   if (mw) return [1, parseFloat(mw[1]), s];
   if (/^[\d.]+$/.test(s)) return [1, parseFloat(s), s];

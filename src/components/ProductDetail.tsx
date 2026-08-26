@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Product } from '../types';
 import { colorOriginalPrice, colorPrice, discountPercent, formatPrice } from '../utils/format';
-import { sortSizes } from '../utils/sizes';
+import { splitTallSizes } from '../utils/sizes';
+import { SizeChips } from './SizeChips';
 
 interface ProductDetailProps {
   product: Product;
@@ -12,9 +13,9 @@ interface ProductDetailProps {
 export function ProductDetail({ product, onAddToCart, onBack }: ProductDetailProps) {
   const [colorId, setColorId] = useState(product.colors[0]?.id ?? '');
   const selectedColor = product.colors.find((c) => c.id === colorId) ?? product.colors[0];
-  const sortedSizes = sortSizes(selectedColor?.sizes ?? []);
+  const { regular: regularSizes, tall: tallSizes } = splitTallSizes(selectedColor?.sizes ?? []);
 
-  const [size, setSize] = useState(sortedSizes[0] ?? '');
+  const [size, setSize] = useState(regularSizes[0] ?? tallSizes[0] ?? '');
   const [activeImage, setActiveImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [dragPx, setDragPx] = useState(0);
@@ -23,11 +24,11 @@ export function ProductDetail({ product, onAddToCart, onBack }: ProductDetailPro
   const galleryTouchStart = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
-    setSize(sortedSizes[0] ?? '');
+    setSize(regularSizes[0] ?? tallSizes[0] ?? '');
     setActiveImage(0);
     setDragPx(0);
     setDragging(false);
-  }, [colorId, selectedColor, sortedSizes]);
+  }, [colorId, selectedColor]);
 
   const price = colorPrice(product, selectedColor);
   const originalPrice = colorOriginalPrice(product, selectedColor);
@@ -192,19 +193,27 @@ export function ProductDetail({ product, onAddToCart, onBack }: ProductDetailPro
 
         <div className="option-group">
           <label>Розмір</label>
-          <div className="size-options">
-            {sortedSizes.map((s) => (
-              <button
-                key={s}
-                type="button"
-                className={`size-chip ${size === s ? 'active' : ''}`}
-                onClick={() => setSize(s)}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
+          <SizeChips
+            sizes={regularSizes}
+            isActive={(s) => size === s}
+            onSelect={setSize}
+            wrapperClassName="size-options"
+            chipClassName="size-chip"
+          />
         </div>
+
+        {tallSizes.length > 0 && (
+          <div className="option-group">
+            <label>Tall</label>
+            <SizeChips
+              sizes={tallSizes}
+              isActive={(s) => size === s}
+              onSelect={setSize}
+              wrapperClassName="size-options"
+              chipClassName="size-chip"
+            />
+          </div>
+        )}
 
         <div className="option-group">
           <label>Кількість</label>

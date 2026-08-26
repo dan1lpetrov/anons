@@ -6,7 +6,7 @@ import type {
   SortOption,
 } from '../types';
 import { categoryEmoji, categoryLabel } from '../data/categories';
-import { sortSizes } from './sizes';
+import { sizeKindForCategory, sortSizes, splitTallSizes, type SizeKind, type TallSplit } from './sizes';
 
 function matchesContext(product: Product, context: CatalogContext): boolean {
   if (context.mode === 'all') return true;
@@ -68,10 +68,27 @@ export function filterAndSortProducts(
   return sortProducts(filterProducts(products, context, filters), sort);
 }
 
-export function getAvailableSizes(products: Product[]): string[] {
-  const all = new Set<string>();
-  products.forEach((p) => p.sizes.forEach((s) => all.add(s)));
-  return sortSizes([...all]);
+export interface AvailableSizes {
+  clothing: TallSplit;
+  shoes: string[];
+  accessories: string[];
+}
+
+export function getAvailableSizes(products: Product[]): AvailableSizes {
+  const byKind: Record<SizeKind, Set<string>> = {
+    clothing: new Set(),
+    shoes: new Set(),
+    accessories: new Set(),
+  };
+  products.forEach((p) => {
+    const kind = sizeKindForCategory(p.categoryId);
+    p.sizes.forEach((s) => byKind[kind].add(s));
+  });
+  return {
+    clothing: splitTallSizes([...byKind.clothing]),
+    shoes: sortSizes([...byKind.shoes]),
+    accessories: sortSizes([...byKind.accessories]),
+  };
 }
 
 export function getAvailableCategories(products: Product[]): Category[] {

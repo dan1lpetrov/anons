@@ -1,5 +1,7 @@
 import { useState, type ChangeEvent, type ReactNode } from 'react';
 import type { CatalogFilters, Sale, SortOption } from '../types';
+import type { AvailableSizes } from '../utils/catalog';
+import { SizeChips } from './SizeChips';
 
 interface SearchProps {
   value: string;
@@ -21,7 +23,7 @@ export function CatalogSearch({ value, onChange }: SearchProps) {
 interface CatalogControlsProps {
   filters: CatalogFilters;
   sort: SortOption;
-  sizes: string[];
+  sizes: AvailableSizes;
   brands: Sale[];
   resultCount: number;
   onFiltersChange: (filters: CatalogFilters) => void;
@@ -50,9 +52,50 @@ export function CatalogControls({ filters, sort, sizes, brands, resultCount, onF
       <FilterGroup title="Бренд">
         {brands.map((brand) => <button key={brand.id} type="button" className={`filter-chip ${filters.brands.includes(brand.id) ? 'active' : ''}`} onClick={() => toggle('brands', brand.id)}>{brand.name}</button>)}
       </FilterGroup>
-      <FilterGroup title="Розмір">
-        {sizes.map((size) => <button key={size} type="button" className={`filter-chip filter-chip--size ${filters.sizes.includes(size) ? 'active' : ''}`} onClick={() => toggle('sizes', size)}>{size}</button>)}
-      </FilterGroup>
+      {sizes.clothing.regular.length > 0 && (
+        <FilterGroup title="Розмір · одяг">
+          <SizeChips
+            sizes={sizes.clothing.regular}
+            isActive={(size) => filters.sizes.includes(size)}
+            onSelect={(size) => toggle('sizes', size)}
+            wrapperClassName="filter-chips"
+            chipClassName="filter-chip filter-chip--size"
+          />
+        </FilterGroup>
+      )}
+      {sizes.clothing.tall.length > 0 && (
+        <FilterGroup title="Розмір · Tall">
+          <SizeChips
+            sizes={sizes.clothing.tall}
+            isActive={(size) => filters.sizes.includes(size)}
+            onSelect={(size) => toggle('sizes', size)}
+            wrapperClassName="filter-chips"
+            chipClassName="filter-chip filter-chip--size"
+          />
+        </FilterGroup>
+      )}
+      {sizes.shoes.length > 0 && (
+        <FilterGroup title="Розмір · взуття">
+          <SizeChips
+            sizes={sizes.shoes}
+            isActive={(size) => filters.sizes.includes(size)}
+            onSelect={(size) => toggle('sizes', size)}
+            wrapperClassName="filter-chips"
+            chipClassName="filter-chip filter-chip--size"
+          />
+        </FilterGroup>
+      )}
+      {sizes.accessories.length > 0 && (
+        <FilterGroup title="Розмір · аксесуари">
+          <SizeChips
+            sizes={sizes.accessories}
+            isActive={(size) => filters.sizes.includes(size)}
+            onSelect={(size) => toggle('sizes', size)}
+            wrapperClassName="filter-chips"
+            chipClassName="filter-chip filter-chip--size"
+          />
+        </FilterGroup>
+      )}
     </>
   );
 

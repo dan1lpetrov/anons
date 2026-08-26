@@ -220,6 +220,15 @@
     const id = raw.product_id || raw.id;
     if (!id) throw new Error(`Товар №${index + 1}: немає id/product_id.`);
 
+    // Взуттєві категорії скрапер розмічає уніфікованим укр. розміром (ua_display) —
+    // саме його показуємо, а не сирий US/унісекс рядок. Одяг (S/M/L) не чіпаємо.
+    const isFootwear = ['shoes', 'footwear', 'sneakers'].includes(raw.category || raw.categoryId || '');
+    function displaySize(s) {
+      if (typeof s === 'string') return s;
+      if (isFootwear && s.ua_display) return s.ua_display;
+      return s.size;
+    }
+
     const rawColors = Array.isArray(raw.colors) ? raw.colors : [];
     const colors = rawColors.map((c, ci) => {
       const pricing = c.pricing || {};
@@ -231,7 +240,7 @@
         thumbnail: c.thumbnail || raw.thumbnail || '',
         images: Array.isArray(c.images) ? c.images : [],
         sizes: Array.isArray(c.sizes)
-          ? c.sizes.filter((s) => s && s.available !== false).map((s) => (typeof s === 'string' ? s : s.size))
+          ? [...new Set(c.sizes.filter((s) => s && s.available !== false).map(displaySize))]
           : [],
         ...(colorPrice !== undefined ? { price: colorPrice } : {}),
         ...(colorOriginalPrice !== undefined ? { originalPrice: colorOriginalPrice } : {}),

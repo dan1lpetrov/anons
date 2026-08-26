@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Product } from '../types';
 import { colorOriginalPrice, colorPrice, discountPercent, formatPrice } from '../utils/format';
+import { sortSizes } from '../utils/sizes';
 
 interface ProductDetailProps {
   product: Product;
@@ -11,8 +12,9 @@ interface ProductDetailProps {
 export function ProductDetail({ product, onAddToCart, onBack }: ProductDetailProps) {
   const [colorId, setColorId] = useState(product.colors[0]?.id ?? '');
   const selectedColor = product.colors.find((c) => c.id === colorId) ?? product.colors[0];
+  const sortedSizes = sortSizes(selectedColor?.sizes ?? []);
 
-  const [size, setSize] = useState(selectedColor?.sizes[0] ?? '');
+  const [size, setSize] = useState(sortedSizes[0] ?? '');
   const [activeImage, setActiveImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [dragPx, setDragPx] = useState(0);
@@ -21,11 +23,11 @@ export function ProductDetail({ product, onAddToCart, onBack }: ProductDetailPro
   const galleryTouchStart = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
-    setSize(selectedColor?.sizes[0] ?? '');
+    setSize(sortedSizes[0] ?? '');
     setActiveImage(0);
     setDragPx(0);
     setDragging(false);
-  }, [colorId, selectedColor]);
+  }, [colorId, selectedColor, sortedSizes]);
 
   const price = colorPrice(product, selectedColor);
   const originalPrice = colorOriginalPrice(product, selectedColor);
@@ -191,7 +193,7 @@ export function ProductDetail({ product, onAddToCart, onBack }: ProductDetailPro
         <div className="option-group">
           <label>Розмір</label>
           <div className="size-options">
-            {(selectedColor?.sizes ?? []).map((s) => (
+            {sortedSizes.map((s) => (
               <button
                 key={s}
                 type="button"

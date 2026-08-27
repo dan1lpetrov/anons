@@ -637,6 +637,8 @@ img {
   height: 100%;
   display: block;
   overflow: visible;
+  cursor: pointer;
+  touch-action: pan-y;
 }
 
 .price-history__gridline {
@@ -651,10 +653,6 @@ img {
   stroke: var(--tg-button);
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
-}
-
-.price-history__hit {
-  cursor: pointer;
 }
 
 .price-history__dot {

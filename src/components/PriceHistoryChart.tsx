@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { MouseEvent, TouchEvent } from 'react';
 import { formatPrice } from '../utils/format';
 
 interface PricePoint {
@@ -19,6 +20,9 @@ const PAD_BOTTOM = 8;
 // the full width reads as a long timeline when it's really just "before/after" —
 // keep them a fixed distance apart instead and leave the rest of the chart empty.
 const TWO_POINT_GAP = 100;
+// Give the highest/lowest price some breathing room from the top/bottom edges
+// instead of the extreme dots sitting flush on the gridlines.
+const VALUE_PAD_RATIO = 0.18;
 
 function formatPointDate(recordedAt: string | null, withYear = false): string {
   if (!recordedAt) return 'було';
@@ -44,9 +48,14 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
   const min = Math.min(...prices);
   const max = Math.max(...prices);
   const span = max - min || 1;
+  const valuePad = span * VALUE_PAD_RATIO;
+  const scaleMin = min - valuePad;
+  const scaleSpan = span + valuePad * 2;
   const plotHeight = HEIGHT - PAD_TOP - PAD_BOTTOM;
   const plotWidth = WIDTH - PAD_X * 2;
   const isPair = points.length === 2;
+
+  const yFor = (price: number) => PAD_TOP + plotHeight - ((price - scaleMin) / scaleSpan) * plotHeight;
 
   // Real history has a recordedAt for every point; the synthesized
   // original->sale cold-start pair has `null` for its first point, so we
@@ -56,6 +65,8 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
   const t0 = times[0];
   const tSpan = times.length ? times[times.length - 1] - t0 || 1 : 1;
 
+  // `x` is the true step-transition position (when the price actually changed);
+  // the step path and hover band lookup are built from this.
   const coords = points.map((p, i) => {
     let x: number;
     if (isPair) {
@@ -64,12 +75,13 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
       const xFrac = hasAllDates ? (times[i] - t0) / tSpan : i / (points.length - 1);
       x = PAD_X + xFrac * plotWidth;
     }
-    return {
-      ...p,
-      x,
-      y: PAD_TOP + plotHeight - ((p.price - min) / span) * plotHeight,
-    };
+    return { ...p, x, y: yFor(p.price) };
   });
+
+  // The dot marker sits in the middle of the flat band it represents (from
+  // its own transition to the next one) instead of at the band's left edge —
+  // the last point has no following band, so it stays at its true position.
+  const markerX = coords.map((c, i) => (i === coords.length - 1 ? c.x : (c.x + coords[i + 1].x) / 2));
 
   // Step-after path: price holds at its value until the moment it changes.
   let stepPath = `M ${coords[0].x} ${coords[0].y}`;
@@ -77,8 +89,26 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
     stepPath += ` L ${coords[i].x} ${coords[i - 1].y} L ${coords[i].x} ${coords[i].y}`;
   }
 
+  const maxY = yFor(max);
+  const minY = yFor(min);
   const tickIndices = pickTickIndices(coords.length);
   const active = activeIndex !== null ? coords[activeIndex] : null;
+
+  function bandIndexForX(svgX: number): number {
+    if (svgX <= coords[0].x) return 0;
+    for (let i = 0; i < coords.length - 1; i++) {
+      if (svgX < coords[i + 1].x) return i;
+    }
+    return coords.length - 1;
+  }
+
+  function handlePointer(event: MouseEvent<SVGSVGElement> | TouchEvent<SVGSVGElement>) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const clientX = 'touches' in event ? event.touches[0]?.clientX : event.clientX;
+    if (clientX == null) return;
+    const svgX = ((clientX - rect.left) / rect.width) * WIDTH;
+    setActiveIndex(bandIndexForX(svgX));
+  }
 
   return (
     <div className="price-history">
@@ -86,38 +116,36 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
       <div className="price-history__chart-wrap">
         <span className="price-history__gridlabel">{formatPrice(max)}</span>
         <div className="price-history__plot" style={{ height: HEIGHT }}>
-          <svg className="price-history__chart" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="none">
-            <line className="price-history__gridline" x1={0} y1={PAD_TOP} x2={WIDTH} y2={PAD_TOP} />
-            <line className="price-history__gridline" x1={0} y1={HEIGHT - PAD_BOTTOM} x2={WIDTH} y2={HEIGHT - PAD_BOTTOM} />
+          <svg
+            className="price-history__chart"
+            viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+            preserveAspectRatio="none"
+            onMouseMove={handlePointer}
+            onMouseLeave={() => setActiveIndex(null)}
+            onTouchStart={handlePointer}
+            onTouchMove={handlePointer}
+          >
+            <rect x={0} y={0} width={WIDTH} height={HEIGHT} fill="transparent" />
+            <line className="price-history__gridline" x1={0} y1={maxY} x2={WIDTH} y2={maxY} />
+            <line className="price-history__gridline" x1={0} y1={minY} x2={WIDTH} y2={minY} />
             <path className="price-history__line" d={stepPath} fill="none" />
             {coords.map((c, i) => (
-              <g key={i}>
-                <circle
-                  className="price-history__hit"
-                  cx={c.x}
-                  cy={c.y}
-                  r={9}
-                  fill="transparent"
-                  onClick={() => setActiveIndex((cur) => (cur === i ? null : i))}
-                  onMouseEnter={() => setActiveIndex(i)}
-                  onMouseLeave={() => setActiveIndex((cur) => (cur === i ? null : cur))}
-                />
-                <circle
-                  className={`price-history__dot ${activeIndex === i ? 'price-history__dot--active' : ''}`}
-                  cx={c.x}
-                  cy={c.y}
-                  r={activeIndex === i ? 5 : 3}
-                />
-              </g>
+              <circle
+                key={i}
+                className={`price-history__dot ${activeIndex === i ? 'price-history__dot--active' : ''}`}
+                cx={markerX[i]}
+                cy={c.y}
+                r={activeIndex === i ? 5 : 3}
+              />
             ))}
           </svg>
           {active && (
             <div
               className="price-history__tooltip"
               style={{
-                left: `${(active.x / WIDTH) * 100}%`,
+                left: `${(markerX[activeIndex as number] / WIDTH) * 100}%`,
                 top: `${(active.y / HEIGHT) * 100}%`,
-                transform: `translate(${active.x < WIDTH / 2 ? '4px' : 'calc(-100% - 4px)'}, -50%)`,
+                transform: `translate(${markerX[activeIndex as number] < WIDTH / 2 ? '4px' : 'calc(-100% - 4px)'}, -50%)`,
               }}
             >
               <strong>{formatPrice(active.price)}</strong>
@@ -135,7 +163,7 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
             <span
               key={i}
               className={`price-history__tick price-history__tick--${align}`}
-              style={{ left: `${(c.x / WIDTH) * 100}%` }}
+              style={{ left: `${(markerX[i] / WIDTH) * 100}%` }}
             >
               {formatPointDate(c.recordedAt)}
             </span>

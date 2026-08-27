@@ -621,6 +621,13 @@ img {
 }
 
 .price-history__chart-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+}
+
+.price-history__plot {
   position: relative;
   width: 100%;
 }
@@ -659,19 +666,8 @@ img {
 }
 
 .price-history__gridlabel {
-  position: absolute;
-  left: 2px;
   font-size: 11px;
   color: var(--tg-hint);
-  pointer-events: none;
-}
-
-.price-history__gridlabel--top {
-  top: 0;
-}
-
-.price-history__gridlabel--bottom {
-  bottom: 0;
 }
 
 .price-history__tooltip {

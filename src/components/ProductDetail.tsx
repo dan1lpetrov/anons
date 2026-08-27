@@ -2,7 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import type { Product } from '../types';
 import { colorOriginalPrice, colorPrice, discountPercent, formatPrice } from '../utils/format';
 import { splitTallSizes } from '../utils/sizes';
+import { PriceHistoryChart } from './PriceHistoryChart';
 import { SizeChips } from './SizeChips';
+
+interface PricePoint {
+  price: number;
+  recordedAt: string | null;
+}
 
 interface ProductDetailProps {
   product: Product;
@@ -20,6 +26,7 @@ export function ProductDetail({ product, onAddToCart, onBack }: ProductDetailPro
   const [quantity, setQuantity] = useState(1);
   const [dragPx, setDragPx] = useState(0);
   const [dragging, setDragging] = useState(false);
+  const [pricePoints, setPricePoints] = useState<PricePoint[]>([]);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const galleryTouchStart = useRef<{ x: number; y: number } | null>(null);
 
@@ -29,6 +36,22 @@ export function ProductDetail({ product, onAddToCart, onBack }: ProductDetailPro
     setDragPx(0);
     setDragging(false);
   }, [colorId, selectedColor]);
+
+  useEffect(() => {
+    if (!colorId) return;
+    let cancelled = false;
+    fetch(`/api/price-history?productId=${encodeURIComponent(product.id)}&colorId=${encodeURIComponent(colorId)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled) setPricePoints(data.points ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setPricePoints([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [product.id, colorId]);
 
   const price = colorPrice(product, selectedColor);
   const originalPrice = colorOriginalPrice(product, selectedColor);
@@ -168,6 +191,8 @@ export function ProductDetail({ product, onAddToCart, onBack }: ProductDetailPro
             <span className="product-detail__original">{formatPrice(originalPrice)}</span>
           )}
         </div>
+
+        <PriceHistoryChart points={pricePoints} />
 
         <p className="product-detail__desc">{product.description}</p>
 

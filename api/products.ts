@@ -1,6 +1,50 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelPoolClient } from '@vercel/postgres';
 import { db, ensureSchema } from './_lib/db.js';
 import { requireAdmin } from './_lib/session.js';
+
+interface PriceHistoryInput {
+  id: string;
+  price: number;
+  colors: Array<{ id?: unknown; price?: unknown }>;
+}
+
+async function recordPriceChanges(client: VercelPoolClient, products: PriceHistoryInput[]) {
+  const entries = products.flatMap((p) =>
+    p.colors
+      .filter((c): c is { id: string; price?: number } => typeof c?.id === 'string')
+      .map((c) => ({
+        productId: p.id,
+        colorId: c.id,
+        price: typeof c.price === 'number' ? c.price : p.price,
+      })),
+  );
+  if (entries.length === 0) return;
+
+  const productIds = [...new Set(entries.map((e) => e.productId))];
+  const { rows } = await client.query<{ product_id: string; color_id: string; price: string }>(
+    `SELECT DISTINCT ON (product_id, color_id) product_id, color_id, price
+     FROM price_history
+     WHERE product_id = ANY($1::text[])
+     ORDER BY product_id, color_id, recorded_at DESC`,
+    [productIds],
+  );
+  const lastPrice = new Map(rows.map((r) => [`${r.product_id}:${r.color_id}`, Number(r.price)]));
+
+  const changed = entries.filter((e) => lastPrice.get(`${e.productId}:${e.colorId}`) !== e.price);
+  if (changed.length === 0) return;
+
+  const values: unknown[] = [];
+  const placeholders = changed.map((e, i) => {
+    const base = i * 3;
+    values.push(e.productId, e.colorId, e.price);
+    return `($${base + 1}, $${base + 2}, $${base + 3})`;
+  });
+  await client.query(
+    `INSERT INTO price_history (product_id, color_id, price) VALUES ${placeholders.join(',')}`,
+    values,
+  );
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   await ensureSchema();
@@ -69,6 +113,7 @@ async function handlePost(req: VercelRequest, res: VercelResponse) {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    await recordPriceChanges(client, products);
     if (mode === 'replace') {
       await client.query('TRUNCATE TABLE products');
     }

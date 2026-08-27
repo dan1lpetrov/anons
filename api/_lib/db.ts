@@ -25,6 +25,18 @@ export async function ensureSchema(): Promise<void> {
             updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
           );
         `);
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS price_history (
+            id SERIAL PRIMARY KEY,
+            product_id TEXT NOT NULL,
+            color_id TEXT NOT NULL,
+            price NUMERIC NOT NULL,
+            recorded_at TIMESTAMPTZ NOT NULL DEFAULT now()
+          );
+        `);
+        await client.query(`
+          CREATE INDEX IF NOT EXISTS price_history_lookup ON price_history (product_id, color_id, recorded_at);
+        `);
       } finally {
         client.release();
       }

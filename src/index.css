@@ -620,10 +620,24 @@ img {
   margin-bottom: 4px;
 }
 
+.price-history__chart-wrap {
+  position: relative;
+  width: 100%;
+}
+
 .price-history__chart {
   width: 100%;
-  height: 48px;
+  height: 100%;
   display: block;
+  overflow: visible;
+}
+
+.price-history__gridline {
+  stroke: var(--tg-hint);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  opacity: 0.25;
+  vector-effect: non-scaling-stroke;
 }
 
 .price-history__line {
@@ -632,16 +646,78 @@ img {
   vector-effect: non-scaling-stroke;
 }
 
+.price-history__hit {
+  cursor: pointer;
+}
+
 .price-history__dot {
   fill: var(--tg-button);
 }
 
-.price-history__range {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
+.price-history__dot--active {
+  fill: var(--tg-text);
+}
+
+.price-history__gridlabel {
+  position: absolute;
+  left: 2px;
+  font-size: 11px;
   color: var(--tg-hint);
+  pointer-events: none;
+}
+
+.price-history__gridlabel--top {
+  top: 0;
+}
+
+.price-history__gridlabel--bottom {
+  bottom: 0;
+}
+
+.price-history__tooltip {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--tg-secondary-bg);
+  box-shadow: var(--shadow);
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.price-history__tooltip strong {
+  color: var(--tg-text);
+  font-size: 13px;
+}
+
+.price-history__tooltip span {
+  color: var(--tg-hint);
+}
+
+.price-history__axis {
+  position: relative;
+  height: 16px;
   margin-top: 2px;
+}
+
+.price-history__tick {
+  position: absolute;
+  font-size: 11px;
+  color: var(--tg-hint);
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+.price-history__tick--left {
+  transform: translateX(0);
+}
+
+.price-history__tick--right {
+  transform: translateX(-100%);
 }
 
 .option-group {

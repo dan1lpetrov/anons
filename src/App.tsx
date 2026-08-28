@@ -5,7 +5,7 @@ import { CatalogControls } from './components/CatalogControls';
 import { Header } from './components/Header';
 import { OrderSuccess } from './components/OrderSuccess';
 import { Pagination } from './components/Pagination';
-import { ProductCard } from './components/ProductCard';
+import { ProductCard, type ProductDebugStats } from './components/ProductCard';
 import { ProductDetail } from './components/ProductDetail';
 import { products as seedProducts } from './data/products';
 import { sales } from './data/sales';
@@ -82,6 +82,24 @@ export default function App() {
     () => filteredProducts.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
     [filteredProducts, currentPage],
   );
+
+  // Admin-only ranking diagnostics for the catalog grid (see CLAUDE.md "Product ranking score").
+  // /api/debug/product-score 401s for non-admins, so debugStats just stays empty for regular visitors.
+  const [debugStats, setDebugStats] = useState<Record<string, ProductDebugStats>>({});
+  useEffect(() => {
+    if (pagedProducts.length === 0) return;
+    let cancelled = false;
+    const ids = pagedProducts.map((p) => p.id).join(',');
+    fetch(`/api/debug/product-score?productIds=${encodeURIComponent(ids)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: Record<string, ProductDebugStats> | null) => {
+        if (!cancelled && data) setDebugStats(data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [pagedProducts]);
 
   useEffect(() => {
     setPage(1);
@@ -271,7 +289,12 @@ export default function App() {
                   <>
                     <div className="product-grid">
                       {pagedProducts.map((product) => (
-                        <ProductCard key={product.id} product={product} onClick={() => openProduct(product.id)} />
+                        <ProductCard
+                          key={product.id}
+                          product={product}
+                          onClick={() => openProduct(product.id)}
+                          debug={debugStats[product.id]}
+                        />
                       ))}
                     </div>
                     <Pagination page={currentPage} totalPages={totalPages} onChange={changePage} />

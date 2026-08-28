@@ -1,12 +1,21 @@
 import type { Product } from '../types';
 import { colorOriginalPrice, colorPrice, discountPercent, formatPrice, pluralizeUk } from '../utils/format';
 
+export interface ProductDebugStats {
+  score: number | null;
+  computedAt: string | null;
+  viewCount: number;
+  orderCount: number;
+  trendingCount: number;
+}
+
 interface ProductCardProps {
   product: Product;
   onClick: () => void;
+  debug?: ProductDebugStats;
 }
 
-export function ProductCard({ product, onClick }: ProductCardProps) {
+export function ProductCard({ product, onClick, debug }: ProductCardProps) {
   const colorPrices = product.colors.length
     ? product.colors.map((c) => colorPrice(product, c))
     : [product.price];
@@ -42,6 +51,24 @@ export function ProductCard({ product, onClick }: ProductCardProps) {
             <span>{product.colors.length} {pluralizeUk(product.colors.length, ['колір', 'кольори', 'кольорів'])}</span>
           )}
         </div>
+        {debug && (
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '2px 8px',
+              marginTop: 6,
+              fontFamily: 'monospace',
+              fontSize: 10,
+              color: '#888',
+            }}
+          >
+            <span>score {debug.score !== null ? debug.score.toFixed(3) : '—'}</span>
+            <span>views {debug.viewCount}</span>
+            <span>orders {debug.orderCount}</span>
+            <span>trend48h {debug.trendingCount}</span>
+          </div>
+        )}
       </div>
     </button>
   );

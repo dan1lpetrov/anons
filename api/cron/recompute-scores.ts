@@ -36,11 +36,29 @@ async function isAuthorized(req: VercelRequest, res: VercelResponse): Promise<bo
 // Ranks values 0..1 within the given set; higher raw value -> higher rank. Products absent from
 // `values` (no data for this signal) are left out of the map entirely — callers apply their own
 // neutral default instead of letting "no data" silently sort as "worst".
+//
+// Tied values MUST get the same rank: rank(v) = (count of values strictly less than v) / (n-1).
+// A naive "sort then use array position" gives ties an arbitrary distinct rank based on whatever
+// order the DB happened to return rows in — with e.g. every product at 0 views right now, that
+// spreads a fake 0..1 spread across a signal that actually carries zero information.
 function percentileRanks(values: Map<string, number>): Map<string, number> {
-  const entries = [...values.entries()].sort((a, b) => a[1] - b[1]);
-  const n = entries.length;
+  const sortedValues = [...values.values()].sort((a, b) => a - b);
+  const n = sortedValues.length;
   const ranks = new Map<string, number>();
-  entries.forEach(([id], i) => ranks.set(id, n > 1 ? i / (n - 1) : 1));
+  for (const [id, v] of values) {
+    if (n <= 1) {
+      ranks.set(id, 1);
+      continue;
+    }
+    let lo = 0;
+    let hi = sortedValues.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (sortedValues[mid] < v) lo = mid + 1;
+      else hi = mid;
+    }
+    ranks.set(id, lo / (n - 1));
+  }
   return ranks;
 }
 

@@ -62,11 +62,14 @@ async function handleGet(res: VercelResponse) {
       SELECT p.data
       FROM products p
       LEFT JOIN sale_windows w ON w.sale_id = p.sale_id
+      LEFT JOIN product_scores s ON s.product_id = p.id
       WHERE w.active IS NOT FALSE
         AND (w.end_date IS NULL OR w.end_date > now())
-      ORDER BY p.featured_rank ASC, p.id ASC
+      ORDER BY s.score DESC NULLS LAST, p.featured_rank ASC, p.id ASC
     `);
-    res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+    // Score only changes on the cron cadence (see CLAUDE.md), so this can be cached briefly
+    // instead of the max-age=0 the old featured_rank-only ordering needed.
+    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
     return res.status(200).json(rows.map((row) => row.data));
   } catch (error) {
     console.error(error);

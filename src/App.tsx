@@ -13,6 +13,7 @@ import { useCart } from './hooks/useCart';
 import { useTelegram } from './hooks/useTelegram';
 import type { CatalogFilters, CategoryId, Order, Product, Screen, SortOption } from './types';
 import { filterAndSortProducts, getAvailableCategories, getAvailableSizes } from './utils/catalog';
+import { logProductEvent, logProductEvents } from './utils/events';
 import {
   createOrderId,
   saveOrderToLocalStorage,
@@ -185,6 +186,7 @@ export default function App() {
 
   const openProduct = (id: string) => {
     navigate('product', id);
+    logProductEvent('view', id, user?.id);
   };
 
   const handleAddToCart = (size: string, colorId: string, quantity: number) => {
@@ -211,6 +213,10 @@ export default function App() {
     };
 
     saveOrderToLocalStorage(order);
+    logProductEvents(
+      [...new Set(order.items.map((i) => i.product.id))].map((productId) => ({ productId, eventType: 'order' as const })),
+      user?.id,
+    );
 
     cart.clearCart();
     setLastOrder(order);

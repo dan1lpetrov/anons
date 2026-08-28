@@ -37,6 +37,36 @@ export async function ensureSchema(): Promise<void> {
         await client.query(`
           CREATE INDEX IF NOT EXISTS price_history_lookup ON price_history (product_id, color_id, recorded_at);
         `);
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS product_events (
+            id SERIAL PRIMARY KEY,
+            telegram_user_id TEXT,
+            product_id TEXT NOT NULL,
+            event_type TEXT NOT NULL CHECK (event_type IN ('view', 'order')),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+          );
+        `);
+        await client.query(`
+          CREATE INDEX IF NOT EXISTS product_events_product_lookup ON product_events (product_id, event_type, created_at);
+        `);
+        await client.query(`
+          CREATE INDEX IF NOT EXISTS product_events_user_lookup ON product_events (telegram_user_id, created_at);
+        `);
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS product_scores (
+            product_id TEXT PRIMARY KEY,
+            score NUMERIC NOT NULL,
+            computed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+          );
+        `);
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS product_similar (
+            product_id TEXT NOT NULL,
+            similar_product_id TEXT NOT NULL,
+            weight NUMERIC NOT NULL,
+            PRIMARY KEY (product_id, similar_product_id)
+          );
+        `);
       } finally {
         client.release();
       }

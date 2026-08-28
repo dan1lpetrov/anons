@@ -55,7 +55,9 @@ export function sortProducts(products: Product[], sort: SortOption): Product[] {
     case 'price-asc':
       return sorted.sort((a, b) => a.price - b.price);
     default:
-      return sorted.sort((a, b) => a.featuredRank - b.featuredRank);
+      // 'recommended': GET /api/products already orders by product_scores.score
+      // (falling back to featured_rank), so keep that order as-is.
+      return sorted;
   }
 }
 

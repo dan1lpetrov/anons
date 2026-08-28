@@ -476,7 +476,13 @@
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
       }
-      setStatus(statusEl, 'ok', `Готово! Залито ${parsed.length} товар(ів). Онови сайт, щоб побачити зміни.`);
+      setStatus(statusEl, 'ok', `Готово! Залито ${parsed.length} товар(ів). Перераховую рейтинги...`);
+      try {
+        await fetch('/api/cron/recompute-scores', { method: 'POST', credentials: 'include' });
+        setStatus(statusEl, 'ok', `Готово! Залито ${parsed.length} товар(ів). Онови сайт, щоб побачити зміни.`);
+      } catch {
+        setStatus(statusEl, 'ok', `Залито ${parsed.length} товар(ів), але не вдалося перерахувати рейтинги — вони оновляться за розкладом.`);
+      }
       loadSales();
     } catch (err) {
       setStatus(statusEl, 'err', 'Помилка: ' + err.message);

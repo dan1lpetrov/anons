@@ -5,131 +5,71 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="robots" content="noindex, nofollow" />
 <title>Anons — Ваги ранжування</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --bg: #ffffff;
-    --text: #1a1a1a;
-    --hint: #8e8e93;
-    --accent: #2481cc;
-    --danger: #ff3b30;
-    --success: #34c759;
-    --secondary-bg: #f2f2f7;
-    --radius: 12px;
-    --border: #e5e5ea;
-  }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    background: var(--secondary-bg);
-    color: var(--text);
-    padding: 24px 16px 64px;
-  }
-  main {
-    max-width: 480px;
-    margin: 0 auto;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-  h1 { font-size: 20px; }
-  p.hint { color: var(--hint); font-size: 14px; }
-  section {
-    background: var(--bg);
-    border-radius: var(--radius);
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    border: 1px solid var(--border);
-  }
-  label { font-size: 13px; font-weight: 600; color: var(--hint); text-transform: uppercase; letter-spacing: 0.02em; }
-  button, a.button {
-    font: inherit;
-    font-weight: 600;
-    border: none;
-    border-radius: 8px;
-    padding: 12px 16px;
-    cursor: pointer;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-  button.primary, a.button.primary { background: var(--accent); color: #fff; }
-  button.secondary, a.button.secondary { background: var(--secondary-bg); color: var(--text); border: 1px solid var(--border); }
-  button:disabled { opacity: 0.5; cursor: not-allowed; }
-  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  .status { font-size: 14px; padding: 10px 12px; border-radius: 8px; display: none; }
-  .status.ok { display: block; background: rgba(52, 199, 89, 0.12); color: #1f7a3d; }
-  .status.err { display: block; background: rgba(255, 59, 48, 0.12); color: var(--danger); }
-  .status.pending { display: block; background: var(--secondary-bg); color: var(--hint); }
-  .account { font-size: 14px; color: var(--hint); }
-  .hidden { display: none !important; }
-  .weights-grid {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 8px 12px;
-    align-items: center;
-  }
-  .weights-grid label { font-size: 14px; font-weight: 400; text-transform: none; color: var(--text); letter-spacing: normal; }
-  .weights-grid input[type="number"] {
-    font: inherit;
-    width: 90px;
-    padding: 8px 10px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    background: var(--secondary-bg);
-    color: var(--text);
-  }
-  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--secondary-bg); padding: 1px 4px; border-radius: 4px; }
-</style>
+<link rel="stylesheet" href="/assets/admin.css" />
 </head>
 <body>
-<main>
-  <div class="row" style="justify-content: space-between;">
-    <h1>Ваги ранжування товарів</h1>
-    <a class="button secondary" href="/admin">← Товари</a>
-  </div>
 
-  <section id="loginSection" class="hidden">
-    <p>Потрібен вхід через Google-акаунт адміністратора.</p>
+<div id="loginScreen" class="login-screen hidden">
+  <div class="login-screen__box">
+    <h1>Anons Admin</h1>
+    <p class="hint">Потрібен вхід через Google-акаунт адміністратора.</p>
     <a class="button primary" href="/admin">Перейти до входу</a>
-  </section>
+  </div>
+</div>
 
-  <section id="weightsSection" class="hidden">
-    <div class="row" style="justify-content: space-between;">
-      <span class="account" id="accountEmail"></span>
-    </div>
-    <p class="hint">Composite score = знижка × w1 + історія цін × w2 + перегляди × w3 + замовлення × w4 + тренд(48г) × w5. Не обовʼязково сумувати рівно в 1 — важливе тільки співвідношення між вагами.</p>
-    <div class="weights-grid">
-      <label for="wDiscount">Знижка</label>
-      <input id="wDiscount" type="number" step="0.01" min="0" />
-      <label for="wPriceHistory">Історія цін</label>
-      <input id="wPriceHistory" type="number" step="0.01" min="0" />
-      <label for="wViews">Перегляди</label>
-      <input id="wViews" type="number" step="0.01" min="0" />
-      <label for="wOrders">Замовлення</label>
-      <input id="wOrders" type="number" step="0.01" min="0" />
-      <label for="wTrending">Тренд (48г)</label>
-      <input id="wTrending" type="number" step="0.01" min="0" />
-    </div>
-    <p class="hint" id="weightsSum"></p>
-    <div class="row">
-      <button id="resetWeights" class="secondary" type="button">Скинути до дефолтних</button>
-      <button id="saveWeights" class="primary" type="button">Зберегти і перерахувати</button>
-    </div>
-    <div id="weightsStatus" class="status"></div>
-  </section>
-</main>
+<div id="app" class="admin-shell hidden">
+  <div id="nav"></div>
+  <main class="admin-content">
+    <div class="admin-content__inner">
+      <h1>Ваги ранжування товарів</h1>
 
+      <section>
+        <p class="hint">Composite score = знижка × w1 + історія цін × w2 + перегляди × w3 + замовлення × w4 + тренд(48г) × w5. Не обовʼязково сумувати рівно в 1 — важливе тільки співвідношення між вагами.</p>
+        <div class="weights-grid">
+          <label for="wDiscount">Знижка</label>
+          <input id="wDiscount" type="number" step="0.01" min="0" />
+          <label for="wPriceHistory">Історія цін</label>
+          <input id="wPriceHistory" type="number" step="0.01" min="0" />
+          <label for="wViews">Перегляди</label>
+          <input id="wViews" type="number" step="0.01" min="0" />
+          <label for="wOrders">Замовлення</label>
+          <input id="wOrders" type="number" step="0.01" min="0" />
+          <label for="wTrending">Тренд (48г)</label>
+          <input id="wTrending" type="number" step="0.01" min="0" />
+        </div>
+        <p class="hint" id="weightsSum"></p>
+      </section>
+
+      <section>
+        <span class="hint">Без збереження ваг</span>
+        <div class="row">
+          <button id="resetWeights" class="secondary" type="button">Скинути до дефолтних</button>
+          <button id="recomputeOnly" class="secondary" type="button">Перерахувати</button>
+        </div>
+        <p class="hint">"Скинути" лише міняє поля вище на дефолтні значення (без збереження). "Перерахувати" запускає recompute на вагах, які зараз збережені в базі — навіть без змін тут, корисно щоб підхопити нові перегляди/замовлення.</p>
+      </section>
+
+      <section>
+        <span class="hint">Зберегти зміни</span>
+        <div class="row">
+          <button id="saveWeights" class="secondary" type="button">Зберегти</button>
+          <button id="saveAndRecompute" class="primary" type="button">Зберегти і перерахувати</button>
+        </div>
+      </section>
+
+      <div id="weightsStatus" class="status"></div>
+    </div>
+  </main>
+</div>
+
+<script src="/assets/admin.js"></script>
 <script>
-  const loginSection = document.getElementById('loginSection');
-  const weightsSection = document.getElementById('weightsSection');
-  const accountEmail = document.getElementById('accountEmail');
   const weightsStatus = document.getElementById('weightsStatus');
   const weightsSum = document.getElementById('weightsSum');
-  const saveWeightsBtn = document.getElementById('saveWeights');
   const resetWeightsBtn = document.getElementById('resetWeights');
+  const recomputeOnlyBtn = document.getElementById('recomputeOnly');
+  const saveWeightsBtn = document.getElementById('saveWeights');
+  const saveAndRecomputeBtn = document.getElementById('saveAndRecompute');
   const weightInputs = {
     discount: document.getElementById('wDiscount'),
     priceVsHistory: document.getElementById('wPriceHistory'),
@@ -137,11 +77,6 @@
     orders: document.getElementById('wOrders'),
     trending: document.getElementById('wTrending'),
   };
-
-  function setStatus(el, kind, text) {
-    el.className = 'status ' + kind;
-    el.textContent = text;
-  }
 
   function fillWeightInputs(weights) {
     for (const key of Object.keys(weightInputs)) {
@@ -168,7 +103,7 @@
   let defaultWeights = null;
 
   async function loadWeights() {
-    setStatus(weightsStatus, 'pending', 'Завантаження...');
+    AdminShared.setStatus(weightsStatus, 'pending', 'Завантаження...');
     try {
       const res = await fetch('/api/score-weights', { cache: 'no-store', credentials: 'include' });
       if (!res.ok) {
@@ -180,66 +115,95 @@
       fillWeightInputs(weights);
       weightsStatus.className = 'status';
     } catch (err) {
-      setStatus(weightsStatus, 'err', 'Помилка: ' + err.message);
+      AdminShared.setStatus(weightsStatus, 'err', 'Помилка: ' + err.message);
     }
+  }
+
+  function validWeightsOrNull() {
+    const weights = readWeightInputs();
+    if (Object.values(weights).some((v) => !Number.isFinite(v) || v < 0)) {
+      AdminShared.setStatus(weightsStatus, 'err', 'Усі ваги мають бути невідʼємними числами.');
+      return null;
+    }
+    return weights;
+  }
+
+  async function saveWeights(weights) {
+    const res = await fetch('/api/score-weights', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(weights),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+  }
+
+  async function recomputeScores() {
+    const res = await fetch('/api/cron/recompute-scores', { method: 'POST', credentials: 'include' });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+    return body;
   }
 
   resetWeightsBtn.addEventListener('click', () => {
     if (defaultWeights) fillWeightInputs(defaultWeights);
   });
 
-  saveWeightsBtn.addEventListener('click', async () => {
-    const weights = readWeightInputs();
-    if (Object.values(weights).some((v) => !Number.isFinite(v) || v < 0)) {
-      setStatus(weightsStatus, 'err', 'Усі ваги мають бути невідʼємними числами.');
-      return;
+  recomputeOnlyBtn.addEventListener('click', async () => {
+    recomputeOnlyBtn.disabled = true;
+    try {
+      AdminShared.setStatus(weightsStatus, 'pending', 'Перераховую скори товарів...');
+      const body = await recomputeScores();
+      AdminShared.setStatus(weightsStatus, 'ok', `Готово! Перераховано ${body.scored} товар(ів), ${body.similarPairs} схожих пар.`);
+    } catch (err) {
+      AdminShared.setStatus(weightsStatus, 'err', 'Помилка: ' + err.message);
+    } finally {
+      recomputeOnlyBtn.disabled = false;
     }
+  });
+
+  saveWeightsBtn.addEventListener('click', async () => {
+    const weights = validWeightsOrNull();
+    if (!weights) return;
 
     saveWeightsBtn.disabled = true;
     try {
-      setStatus(weightsStatus, 'pending', 'Зберігаю ваги...');
-      const saveRes = await fetch('/api/score-weights', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(weights),
-      });
-      const saveBody = await saveRes.json().catch(() => ({}));
-      if (!saveRes.ok) throw new Error(saveBody.error || `HTTP ${saveRes.status}`);
-
-      setStatus(weightsStatus, 'pending', 'Ваги збережено. Перераховую скори товарів...');
-      const scoreRes = await fetch('/api/cron/recompute-scores', { method: 'POST', credentials: 'include' });
-      const scoreBody = await scoreRes.json().catch(() => ({}));
-      if (!scoreRes.ok) throw new Error(scoreBody.error || `HTTP ${scoreRes.status}`);
-
-      setStatus(
-        weightsStatus,
-        'ok',
-        `Готово! Перераховано ${scoreBody.scored} товар(ів), ${scoreBody.similarPairs} схожих пар. Онови сайт, щоб побачити зміни.`,
-      );
+      AdminShared.setStatus(weightsStatus, 'pending', 'Зберігаю ваги...');
+      await saveWeights(weights);
+      AdminShared.setStatus(weightsStatus, 'ok', 'Ваги збережено. Наберуть чинності при наступному перерахунку.');
     } catch (err) {
-      setStatus(weightsStatus, 'err', 'Помилка: ' + err.message);
+      AdminShared.setStatus(weightsStatus, 'err', 'Помилка: ' + err.message);
     } finally {
       saveWeightsBtn.disabled = false;
     }
   });
 
-  async function checkSession() {
-    try {
-      const res = await fetch('/api/auth/me', { credentials: 'include' });
-      if (!res.ok) throw new Error('unauthorized');
-      const { email } = await res.json();
-      loginSection.classList.add('hidden');
-      weightsSection.classList.remove('hidden');
-      accountEmail.textContent = email;
-      loadWeights();
-    } catch {
-      loginSection.classList.remove('hidden');
-      weightsSection.classList.add('hidden');
-    }
-  }
+  saveAndRecomputeBtn.addEventListener('click', async () => {
+    const weights = validWeightsOrNull();
+    if (!weights) return;
 
-  checkSession();
+    saveAndRecomputeBtn.disabled = true;
+    try {
+      AdminShared.setStatus(weightsStatus, 'pending', 'Зберігаю ваги...');
+      await saveWeights(weights);
+      AdminShared.setStatus(weightsStatus, 'pending', 'Ваги збережено. Перераховую скори товарів...');
+      const body = await recomputeScores();
+      AdminShared.setStatus(
+        weightsStatus,
+        'ok',
+        `Готово! Перераховано ${body.scored} товар(ів), ${body.similarPairs} схожих пар. Онови сайт, щоб побачити зміни.`,
+      );
+    } catch (err) {
+      AdminShared.setStatus(weightsStatus, 'err', 'Помилка: ' + err.message);
+    } finally {
+      saveAndRecomputeBtn.disabled = false;
+    }
+  });
+
+  AdminShared.init('weights').then((email) => {
+    if (email) loadWeights();
+  });
 </script>
 </body>
 </html>

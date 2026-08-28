@@ -4,167 +4,46 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="robots" content="noindex, nofollow" />
-<title>Anons — Адмінка товарів</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --bg: #ffffff;
-    --text: #1a1a1a;
-    --hint: #8e8e93;
-    --accent: #2481cc;
-    --danger: #ff3b30;
-    --success: #34c759;
-    --secondary-bg: #f2f2f7;
-    --radius: 12px;
-    --border: #e5e5ea;
-  }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    background: var(--secondary-bg);
-    color: var(--text);
-    padding: 24px 16px 64px;
-  }
-  main {
-    max-width: 640px;
-    margin: 0 auto;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-  h1 { font-size: 20px; }
-  p.hint { color: var(--hint); font-size: 14px; }
-  section {
-    background: var(--bg);
-    border-radius: var(--radius);
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    border: 1px solid var(--border);
-  }
-  textarea {
-    font: inherit;
-    padding: 10px 12px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    background: var(--secondary-bg);
-    color: var(--text);
-    width: 100%;
-    min-height: 220px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 12px;
-    resize: vertical;
-  }
-  label { font-size: 13px; font-weight: 600; color: var(--hint); text-transform: uppercase; letter-spacing: 0.02em; }
-  button, a.button {
-    font: inherit;
-    font-weight: 600;
-    border: none;
-    border-radius: 8px;
-    padding: 12px 16px;
-    cursor: pointer;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-  button.primary, a.button.primary { background: var(--accent); color: #fff; }
-  button.secondary { background: var(--secondary-bg); color: var(--text); border: 1px solid var(--border); }
-  button.danger { background: rgba(255, 59, 48, 0.12); color: var(--danger); }
-  button:disabled { opacity: 0.5; cursor: not-allowed; }
-  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  .status { font-size: 14px; padding: 10px 12px; border-radius: 8px; display: none; }
-  .status.ok { display: block; background: rgba(52, 199, 89, 0.12); color: #1f7a3d; }
-  .status.err { display: block; background: rgba(255, 59, 48, 0.12); color: var(--danger); }
-  .status.pending { display: block; background: var(--secondary-bg); color: var(--hint); }
-  .account { font-size: 14px; color: var(--hint); }
-  .hidden { display: none !important; }
-  .sale-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    padding: 8px 0;
-    border-bottom: 1px solid var(--border);
-  }
-  .sale-row:last-child { border-bottom: none; }
-  .sale-row__name { font-weight: 600; min-width: 90px; }
-  .sale-row__badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; }
-  .sale-row__badge.active { background: rgba(52, 199, 89, 0.15); color: #1f7a3d; }
-  .sale-row__badge.stopped { background: rgba(255, 59, 48, 0.12); color: var(--danger); }
-  .sale-row input[type="date"] { font: inherit; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--secondary-bg); color: var(--text); }
-  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--secondary-bg); padding: 1px 4px; border-radius: 4px; }
-</style>
+<title>Anons — Адмінка</title>
+<link rel="stylesheet" href="/assets/admin.css" />
 </head>
 <body>
-<main>
-  <div>
-    <h1>Товари — завантаження без деплою</h1>
-    <p class="hint">Встав JSON або JSONL зі скрапера (по одному товару на рядок) або завантаж файл — формат нормалізується автоматично, і сайт одразу підхопить нові дані.</p>
+
+<div id="loginScreen" class="login-screen hidden">
+  <div class="login-screen__box">
+    <h1>Anons Admin</h1>
+    <p class="hint" id="loginStatus"></p>
+    <a class="button primary" href="/api/auth/login">Увійти через Google</a>
   </div>
+</div>
 
-  <section id="loginSection">
-    <p>Потрібен вхід через Google-акаунт адміністратора.</p>
-    <div id="loginStatus" class="status"></div>
-    <div class="row">
-      <a class="button primary" href="/api/auth/login">Увійти через Google</a>
+<div id="app" class="admin-shell hidden">
+  <div id="nav"></div>
+  <main class="admin-content">
+    <div class="admin-content__inner">
+      <div class="row" style="justify-content: space-between;">
+        <h1>Розпродажі</h1>
+        <a class="button primary" href="/admin/upload">+ Додати розпродаж</a>
+      </div>
+
+      <section>
+        <div class="row" style="justify-content: space-between;">
+          <span class="hint">Термін дії, активність і видалення розпродажів</span>
+          <button id="reloadSales" class="secondary" type="button">Оновити</button>
+        </div>
+        <div id="salesList"></div>
+        <div id="salesStatus" class="status"></div>
+      </section>
     </div>
-  </section>
+  </main>
+</div>
 
-  <section id="adminSection" class="hidden">
-    <div class="row" style="justify-content: space-between;">
-      <span class="account" id="accountEmail"></span>
-      <button class="secondary" id="logout" type="button">Вийти</button>
-    </div>
-  </section>
-
-  <section id="uploadSection" class="hidden">
-    <label for="file">Файл products.json або products.jsonl</label>
-    <input id="file" type="file" accept="application/json,.json,.jsonl,text/plain" />
-    <label for="json">Або встав JSON вручну</label>
-    <textarea id="json" placeholder="[ { &quot;id&quot;: &quot;...&quot;, &quot;name&quot;: &quot;...&quot;, ... } ]"></textarea>
-    <label for="endDate">Дійсні до (необов'язково)</label>
-    <input id="endDate" type="date" />
-    <p class="hint">Якщо вказати дату — після неї товари з цього завантаження автоматично зникнуть із сайту. Порожнє поле нічого не змінює в термінах, які вже задані.</p>
-    <div class="row">
-      <button id="loadCurrent" class="secondary" type="button">Завантажити поточні товари</button>
-      <button id="upload" class="primary" type="button">Залити на сайт</button>
-    </div>
-    <div id="status" class="status"></div>
-  </section>
-
-  <section id="salesSection" class="hidden">
-    <div class="row" style="justify-content: space-between;">
-      <h1 style="font-size: 15px;">Розпродажі — термін дії</h1>
-      <button id="reloadSales" class="secondary" type="button">Оновити</button>
-    </div>
-    <div id="salesList"></div>
-    <div id="salesStatus" class="status"></div>
-  </section>
-
-  <section id="weightsLinkSection" class="hidden">
-    <a class="button secondary" href="/admin/weights">Ваги ранжування товарів →</a>
-  </section>
-</main>
-
+<script src="/assets/admin.js"></script>
 <script>
-  const loginSection = document.getElementById('loginSection');
   const loginStatus = document.getElementById('loginStatus');
-  const adminSection = document.getElementById('adminSection');
-  const uploadSection = document.getElementById('uploadSection');
-  const accountEmail = document.getElementById('accountEmail');
-  const fileInput = document.getElementById('file');
-  const jsonArea = document.getElementById('json');
-  const statusEl = document.getElementById('status');
-  const uploadBtn = document.getElementById('upload');
-  const loadBtn = document.getElementById('loadCurrent');
-  const logoutBtn = document.getElementById('logout');
-  const endDateInput = document.getElementById('endDate');
-  const salesSection = document.getElementById('salesSection');
   const salesList = document.getElementById('salesList');
   const salesStatus = document.getElementById('salesStatus');
   const reloadSalesBtn = document.getElementById('reloadSales');
-  const weightsLinkSection = document.getElementById('weightsLinkSection');
 
   const ERROR_MESSAGES = {
     forbidden: 'Цей Google-акаунт не має доступу до адмінки.',
@@ -173,142 +52,17 @@
     token_exchange_failed: 'Не вдалося завершити вхід через Google.',
   };
 
-  function setStatus(el, kind, text) {
-    el.className = 'status ' + kind;
-    el.textContent = text;
-  }
-
-  function parseProductsPayload(text) {
-    const trimmed = text.trim();
-    if (!trimmed) throw new Error('Порожній ввід.');
-
-    // Звичайний JSON: масив товарів або один товар
-    try {
-      const data = JSON.parse(trimmed);
-      if (Array.isArray(data)) return data;
-      if (data && typeof data === 'object') return [data];
-    } catch {
-      // не валідний як єдиний JSON — пробуємо JSONL нижче
-    }
-
-    // JSONL: один JSON-обʼєкт на рядок
-    const lines = trimmed.split('\n').map((l) => l.trim()).filter(Boolean);
-    const items = [];
-    lines.forEach((line, i) => {
-      try {
-        items.push(JSON.parse(line));
-      } catch {
-        throw new Error(`Невалідний JSON у рядку ${i + 1}.`);
-      }
-    });
-    if (items.length === 0) throw new Error('Не знайдено жодного товару.');
-    return items;
-  }
-
-  const SALES = {
-    nike: { name: 'Nike', url: 'https://www.nike.com/sale' },
-    adidas: { name: 'Adidas', url: 'https://www.adidas.com/outlet' },
-    puma: { name: 'Puma', url: 'https://eu.puma.com/uk/en/sports/sale' },
-  };
-
-  function normalizeProduct(raw, index) {
-    if (!raw || typeof raw !== 'object') {
-      throw new Error(`Товар №${index + 1}: не є обʼєктом.`);
-    }
-
-    // Вже в потрібному форматі — нічого не робимо
-    if (typeof raw.id === 'string' && typeof raw.name === 'string' && typeof raw.price === 'number') {
-      return raw;
-    }
-
-    // Сирий формат скрапера (product_id, title, colors[].pricing, ...)
-    const id = raw.product_id || raw.id;
-    if (!id) throw new Error(`Товар №${index + 1}: немає id/product_id.`);
-
-    // Взуттєві категорії скрапер розмічає уніфікованим укр. розміром (ua_display) —
-    // саме його показуємо, а не сирий US/унісекс рядок. Одяг (S/M/L) не чіпаємо.
-    const isFootwear = ['shoes', 'footwear', 'sneakers'].includes(raw.category || raw.categoryId || '');
-    function displaySize(s) {
-      if (typeof s === 'string') return s;
-      if (isFootwear && s.ua_display) return s.ua_display;
-      return s.size;
-    }
-
-    const rawColors = Array.isArray(raw.colors) ? raw.colors : [];
-    const colors = rawColors.map((c, ci) => {
-      const pricing = c.pricing || {};
-      const colorPrice = typeof pricing.sale_price === 'number' ? pricing.sale_price : undefined;
-      const colorOriginalPrice = typeof pricing.original_price === 'number' ? pricing.original_price : undefined;
-      return {
-        id: c.product_id || c.id || `${id}-${ci}`,
-        name: c.name || c.product_id || `Варіант ${ci + 1}`,
-        thumbnail: c.thumbnail || raw.thumbnail || '',
-        images: Array.isArray(c.images) ? c.images : [],
-        sizes: Array.isArray(c.sizes)
-          ? [...new Set(c.sizes.filter((s) => s && s.available !== false).map(displaySize))]
-          : [],
-        ...(colorPrice !== undefined ? { price: colorPrice } : {}),
-        ...(colorOriginalPrice !== undefined ? { originalPrice: colorOriginalPrice } : {}),
-      };
-    });
-
-    // Ціна товару на картці — найдешевший варіант кольору (якщо ціни різняться між кольорами).
-    const colorsWithPrice = colors.filter((c) => typeof c.price === 'number');
-    const cheapestColor = colorsWithPrice.length
-      ? colorsWithPrice.reduce((min, c) => (c.price < min.price ? c : min))
-      : null;
-    const allSizes = [...new Set(colors.flatMap((c) => c.sizes))];
-    const saleId = raw.source || raw.saleId || '';
-    const brand = SALES[saleId];
-
-    return {
-      id,
-      name: raw.title || raw.name || id,
-      description: raw.description || raw.title || '',
-      price: (cheapestColor && cheapestColor.price) ?? raw.price ?? 0,
-      originalPrice: (cheapestColor && cheapestColor.originalPrice) ?? raw.originalPrice,
-      categoryId: raw.category || raw.categoryId || 'other',
-      saleId,
-      sourceName: raw.sourceName || (brand && brand.name) || saleId,
-      sourceUrl: raw.sourceUrl || (brand && brand.url) || '',
-      productUrl: raw.url || raw.productUrl || '',
-      image: (rawColors[0] && rawColors[0].thumbnail) || raw.image || '',
-      sizes: allSizes,
-      colors,
-      featuredRank: raw.featuredRank ?? 0,
-    };
-  }
-
-  async function checkSession() {
+  (function showLoginError() {
     const params = new URLSearchParams(location.search);
     const error = params.get('error');
     if (error) {
-      setStatus(loginStatus, 'err', ERROR_MESSAGES[error] || ('Помилка входу: ' + error));
+      loginStatus.textContent = ERROR_MESSAGES[error] || ('Помилка входу: ' + error);
       history.replaceState(null, '', location.pathname);
     }
-
-    try {
-      const res = await fetch('/api/auth/me', { credentials: 'include' });
-      if (!res.ok) throw new Error('unauthorized');
-      const { email } = await res.json();
-      loginSection.classList.add('hidden');
-      adminSection.classList.remove('hidden');
-      uploadSection.classList.remove('hidden');
-      salesSection.classList.remove('hidden');
-      weightsLinkSection.classList.remove('hidden');
-      accountEmail.textContent = email;
-      loadSales();
-    } catch {
-      loginSection.classList.remove('hidden');
-      adminSection.classList.add('hidden');
-      uploadSection.classList.add('hidden');
-      salesSection.classList.add('hidden');
-      weightsLinkSection.classList.add('hidden');
-    }
-  }
+  })();
 
   async function loadSales() {
-    setStatus(salesStatus, 'pending', 'Завантаження...');
+    AdminShared.setStatus(salesStatus, 'pending', 'Завантаження...');
     try {
       const res = await fetch('/api/sales', { cache: 'no-store', credentials: 'include' });
       if (!res.ok) {
@@ -319,14 +73,14 @@
       renderSales(sales);
       salesStatus.className = 'status';
     } catch (err) {
-      setStatus(salesStatus, 'err', 'Помилка: ' + err.message);
+      AdminShared.setStatus(salesStatus, 'err', 'Помилка: ' + err.message);
     }
   }
 
   function renderSales(sales) {
     salesList.innerHTML = '';
     if (sales.length === 0) {
-      salesList.innerHTML = '<p class="hint">Ще немає жодного залитого товару.</p>';
+      salesList.innerHTML = '<p class="hint">Ще немає жодного залитого товару. Натисни "Додати розпродаж".</p>';
       return;
     }
 
@@ -370,7 +124,7 @@
   }
 
   async function saveSale(saleId, endDate, active) {
-    setStatus(salesStatus, 'pending', 'Збереження...');
+    AdminShared.setStatus(salesStatus, 'pending', 'Збереження...');
     try {
       const res = await fetch('/api/sales', {
         method: 'POST',
@@ -380,16 +134,16 @@
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-      setStatus(salesStatus, 'ok', 'Збережено.');
+      AdminShared.setStatus(salesStatus, 'ok', 'Збережено.');
       loadSales();
     } catch (err) {
-      setStatus(salesStatus, 'err', 'Помилка: ' + err.message);
+      AdminShared.setStatus(salesStatus, 'err', 'Помилка: ' + err.message);
     }
   }
 
   async function deleteSale(saleId) {
     if (!confirm(`Видалити розпродаж "${saleId}" і всі його товари? Це незворотньо.`)) return;
-    setStatus(salesStatus, 'pending', 'Видалення...');
+    AdminShared.setStatus(salesStatus, 'pending', 'Видалення...');
     try {
       const res = await fetch(`/api/sales?saleId=${encodeURIComponent(saleId)}`, {
         method: 'DELETE',
@@ -397,108 +151,18 @@
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-      setStatus(salesStatus, 'ok', `Видалено. Товарів прибрано: ${body.removedProducts ?? 0}.`);
+      AdminShared.setStatus(salesStatus, 'ok', `Видалено. Товарів прибрано: ${body.removedProducts ?? 0}.`);
       loadSales();
     } catch (err) {
-      setStatus(salesStatus, 'err', 'Помилка: ' + err.message);
+      AdminShared.setStatus(salesStatus, 'err', 'Помилка: ' + err.message);
     }
   }
 
   reloadSalesBtn.addEventListener('click', loadSales);
 
-  logoutBtn.addEventListener('click', async () => {
-    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
-    checkSession();
+  AdminShared.init('sales').then((email) => {
+    if (email) loadSales();
   });
-
-  fileInput.addEventListener('change', async () => {
-    const file = fileInput.files?.[0];
-    if (!file) return;
-    jsonArea.value = await file.text();
-  });
-
-  loadBtn.addEventListener('click', async () => {
-    setStatus(statusEl, 'pending', 'Завантаження...');
-    try {
-      const res = await fetch('/api/products', { cache: 'no-store', credentials: 'include' });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || `HTTP ${res.status}`);
-      }
-      const data = await res.json();
-      jsonArea.value = JSON.stringify(data, null, 2);
-      setStatus(statusEl, 'ok', `Завантажено ${data.length} товар(ів).`);
-    } catch (err) {
-      setStatus(statusEl, 'err', 'Помилка: ' + err.message);
-    }
-  });
-
-  // Vercel обмежує тіло запиту ~4.5 MB — дробимо великі заливки на батчі.
-  const UPLOAD_BATCH_MAX_BYTES = 3_500_000;
-
-  function chunkProductsForUpload(products) {
-    const batches = [];
-    let current = [];
-    for (const product of products) {
-      const trial = current.concat(product);
-      const bytes = JSON.stringify({ products: trial, mode: 'replace' }).length;
-      if (current.length > 0 && bytes > UPLOAD_BATCH_MAX_BYTES) {
-        batches.push(current);
-        current = [product];
-      } else {
-        current = trial;
-      }
-    }
-    if (current.length > 0) batches.push(current);
-    return batches;
-  }
-
-  uploadBtn.addEventListener('click', async () => {
-    let parsed;
-    try {
-      parsed = parseProductsPayload(jsonArea.value).map(normalizeProduct);
-    } catch (err) {
-      setStatus(statusEl, 'err', err.message || 'Невалідний JSON.');
-      return;
-    }
-
-    const batches = chunkProductsForUpload(parsed);
-    const endDate = endDateInput.value || null;
-
-    uploadBtn.disabled = true;
-    try {
-      for (let i = 0; i < batches.length; i++) {
-        const batchLabel = batches.length > 1 ? ` (${i + 1}/${batches.length})` : '';
-        setStatus(statusEl, 'pending', `Заливаю...${batchLabel}`);
-        const res = await fetch('/api/products', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            products: batches[i],
-            mode: i === 0 ? 'replace' : 'append',
-            endDate: i === 0 ? endDate : null,
-          }),
-        });
-        const body = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-      }
-      setStatus(statusEl, 'ok', `Готово! Залито ${parsed.length} товар(ів). Перераховую рейтинги...`);
-      try {
-        await fetch('/api/cron/recompute-scores', { method: 'POST', credentials: 'include' });
-        setStatus(statusEl, 'ok', `Готово! Залито ${parsed.length} товар(ів). Онови сайт, щоб побачити зміни.`);
-      } catch {
-        setStatus(statusEl, 'ok', `Залито ${parsed.length} товар(ів), але не вдалося перерахувати рейтинги — вони оновляться за розкладом.`);
-      }
-      loadSales();
-    } catch (err) {
-      setStatus(statusEl, 'err', 'Помилка: ' + err.message);
-    } finally {
-      uploadBtn.disabled = false;
-    }
-  });
-
-  checkSession();
 </script>
 </body>
 </html>

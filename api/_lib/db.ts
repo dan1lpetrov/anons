@@ -67,6 +67,18 @@ export async function ensureSchema(): Promise<void> {
             PRIMARY KEY (product_id, similar_product_id)
           );
         `);
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS score_weights (
+            id INTEGER PRIMARY KEY DEFAULT 1,
+            discount NUMERIC NOT NULL DEFAULT 0.25,
+            price_vs_history NUMERIC NOT NULL DEFAULT 0.25,
+            views NUMERIC NOT NULL DEFAULT 0.15,
+            orders NUMERIC NOT NULL DEFAULT 0.25,
+            trending NUMERIC NOT NULL DEFAULT 0.1,
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            CHECK (id = 1)
+          );
+        `);
       } finally {
         client.release();
       }

@@ -1,15 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, ensureSchema } from '../_lib/db.js';
 import { requireAdmin } from '../_lib/session.js';
-
-// Manual defaults — see CLAUDE.md "Planned: product ranking score". Sum to 1; tune here, no A/B mechanism yet.
-const WEIGHTS = {
-  discount: 0.25,
-  priceVsHistory: 0.25,
-  views: 0.15,
-  orders: 0.25,
-  trending: 0.1,
-};
+import { getWeights } from '../_lib/weights.js';
 
 const TRENDING_WINDOW_HOURS = 48;
 const TOP_SIMILAR_PER_PRODUCT = 10;
@@ -73,6 +65,8 @@ function effectiveOriginalPrice(product: ProductData, color: ProductColorData): 
 }
 
 async function recompute(): Promise<{ scored: number; similarPairs: number }> {
+  const WEIGHTS = await getWeights();
+
   const { rows: products } = await db.query<{ id: string; data: ProductData }>(`
     SELECT p.id, p.data
     FROM products p

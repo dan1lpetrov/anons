@@ -1,16 +1,23 @@
 import { useEffect, useRef } from 'react';
-import { Search, X } from 'lucide-react';
+import { Search, ShoppingCart, X } from 'lucide-react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTelegramContext } from '../hooks/useTelegram';
 
-export function Header() {
+interface HeaderProps {
+  cartCount: number;
+}
+
+export function Header({ cartCount }: HeaderProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { haptic } = useTelegramContext();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // No search box on /product or /cart etc — search is a catalog-page affordance.
-  const showSearch = location.pathname === '/' || location.pathname.startsWith('/catalog');
+  // No search box on /cart etc — search is a catalog/product-page affordance.
+  const showSearch =
+    location.pathname === '/' ||
+    location.pathname.startsWith('/catalog') ||
+    location.pathname.startsWith('/product');
   const onCatalog = location.pathname.startsWith('/catalog');
   const searchValue = onCatalog ? (searchParams.get('q') ?? '') : '';
 
@@ -113,6 +120,15 @@ export function Header() {
             )}
           </label>
         )}
+        <button
+          type="button"
+          className="app-header__cart"
+          onClick={() => { haptic('light'); navigate('/cart'); }}
+          aria-label="Кошик"
+        >
+          <ShoppingCart size={20} strokeWidth={2} />
+          {cartCount > 0 && <span className="app-header__cart-badge">{cartCount}</span>}
+        </button>
       </div>
     </header>
   );

@@ -149,6 +149,12 @@ img {
   margin: 0;
 }
 
+/* Bottom nav (with its own cart tab) is the mobile cart affordance and is
+   hidden past 720px — without this, desktop has no way to reach /cart. */
+.app-header__cart {
+  display: none;
+}
+
 .app-main {
   flex: 1;
   width: 100%;
@@ -867,6 +873,24 @@ img {
   width: 60%;
 }
 
+.product-detail-skeleton {
+  padding-top: 4px;
+}
+
+.product-detail-skeleton__image {
+  aspect-ratio: 1;
+  margin-bottom: 16px;
+}
+
+.product-detail-skeleton .skeleton-line {
+  height: 16px;
+  margin-bottom: 10px;
+}
+
+.product-detail-skeleton .skeleton-line--short {
+  width: 45%;
+}
+
 .empty-state {
   text-align: center;
   padding: 60px 20px;
@@ -1392,6 +1416,36 @@ img {
 
   .app--with-nav .app-main {
     padding-bottom: 24px;
+  }
+
+  .app-header__cart {
+    position: relative;
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    background: var(--tg-secondary-bg);
+    color: var(--tg-text);
+  }
+
+  .app-header__cart-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: var(--accent);
+    color: var(--accent-text);
+    font-size: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .category-filter {

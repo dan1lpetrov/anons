@@ -27,15 +27,31 @@ import { getScrollContainer } from './utils/scroll';
 
 interface ProductRouteProps {
   products: Product[];
+  isLoadingProducts: boolean;
   onAddToCart: (product: Product, size: string, colorId: string, quantity: number) => void;
   onBack: () => void;
   onShare: (product: Product) => void;
 }
 
-function ProductRoute({ products, onAddToCart, onBack, onShare }: ProductRouteProps) {
+function ProductRoute({ products, isLoadingProducts, onAddToCart, onBack, onShare }: ProductRouteProps) {
   const { id } = useParams<{ id: string }>();
   const product = products.find((p) => p.id === id);
-  if (!product) return <Navigate to="/" replace />;
+  if (!product) {
+    // A shared link hard-loads this route before the /api/products fetch
+    // resolves, so `products` is briefly empty — wait for it instead of
+    // bouncing straight to home, or a direct product link would never work.
+    if (isLoadingProducts) {
+      return (
+        <div className="product-detail-skeleton">
+          <div className="skeleton-block product-detail-skeleton__image" />
+          <div className="skeleton-block skeleton-line skeleton-line--short" />
+          <div className="skeleton-block skeleton-line" />
+          <div className="skeleton-block skeleton-line skeleton-line--short" />
+        </div>
+      );
+    }
+    return <Navigate to="/" replace />;
+  }
   return (
     <ProductDetail
       product={product}
@@ -236,7 +252,7 @@ export default function App() {
   return (
     <TelegramContext.Provider value={telegram}>
       <div className={`app ${showBottomNav ? 'app--with-nav' : ''}`}>
-        <Header />
+        <Header cartCount={cart.totalItems} />
 
         <main className="app-main">
           <Routes>
@@ -267,6 +283,7 @@ export default function App() {
               element={
                 <ProductRoute
                   products={products}
+                  isLoadingProducts={isLoadingProducts}
                   onAddToCart={handleAddToCart}
                   onBack={goBack}
                   onShare={handleShareProduct}

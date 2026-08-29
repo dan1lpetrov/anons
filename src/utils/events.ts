@@ -3,6 +3,9 @@ export type ProductEventType = 'view' | 'order';
 interface ProductEventInput {
   productId: string;
   eventType: ProductEventType;
+  orderId?: string;
+  quantity?: number;
+  unitPrice?: number;
 }
 
 // Fire-and-forget: telemetry must never block or fail the UI it's attached to.

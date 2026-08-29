@@ -221,8 +221,9 @@ export default function App() {
   };
 
   const handleSubmitOrder = (comment: string) => {
+    const orderId = createOrderId();
     const order: Order = {
-      id: createOrderId(),
+      id: orderId,
       createdAt: new Date().toISOString(),
       customer: { comment },
       items: cart.enrichedItems.map(({ product, color, item, lineTotal }) => ({
@@ -237,8 +238,16 @@ export default function App() {
     };
 
     saveOrderToLocalStorage(order);
+    // One event per cart line (not deduped by product) so the admin dashboard can derive both a
+    // distinct-order count (COUNT DISTINCT orderId) and an order value (SUM quantity*unitPrice).
     logProductEvents(
-      [...new Set(order.items.map((i) => i.product.id))].map((productId) => ({ productId, eventType: 'order' as const })),
+      order.items.map((i) => ({
+        productId: i.product.id,
+        eventType: 'order' as const,
+        orderId,
+        quantity: i.quantity,
+        unitPrice: i.lineTotal / i.quantity,
+      })),
       user?.id,
     );
 

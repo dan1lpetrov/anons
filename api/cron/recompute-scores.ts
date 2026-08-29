@@ -1,21 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, ensureSchema } from '../_lib/db.js';
+import { effectiveOriginalPrice, effectivePrice, type ProductData } from '../_lib/pricing.js';
 import { requireAdmin } from '../_lib/session.js';
 import { getWeights } from '../_lib/weights.js';
 
 const TRENDING_WINDOW_HOURS = 48;
 const TOP_SIMILAR_PER_PRODUCT = 10;
-
-interface ProductColorData {
-  id?: unknown;
-  price?: unknown;
-  originalPrice?: unknown;
-}
-interface ProductData {
-  price?: unknown;
-  originalPrice?: unknown;
-  colors?: ProductColorData[];
-}
 
 async function isAuthorized(req: VercelRequest, res: VercelResponse): Promise<boolean> {
   const cronSecret = process.env.CRON_SECRET;
@@ -52,16 +42,6 @@ function percentileRanks(values: Map<string, number>): Map<string, number> {
     ranks.set(id, lo / (n - 1));
   }
   return ranks;
-}
-
-function effectivePrice(product: ProductData, color: ProductColorData): number | undefined {
-  return typeof color.price === 'number' ? color.price : typeof product.price === 'number' ? product.price : undefined;
-}
-
-function effectiveOriginalPrice(product: ProductData, color: ProductColorData): number | undefined {
-  if (typeof color.originalPrice === 'number') return color.originalPrice;
-  if (typeof product.originalPrice === 'number') return product.originalPrice;
-  return undefined;
 }
 
 async function recompute(): Promise<{ scored: number; similarPairs: number }> {

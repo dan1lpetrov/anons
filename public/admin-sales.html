@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Anons — Розпродажі</title>
+<script>(function(){try{var t=localStorage.getItem('anons-admin-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/assets/admin.css" />
+</head>
+<body>
+
+<div id="loginScreen" class="login-screen hidden">
+  <div class="login-screen__box">
+    <h1>Anons Admin</h1>
+    <p class="hint" id="loginStatus"></p>
+    <a class="button primary" href="/api/auth/login">Увійти через Google</a>
+  </div>
+</div>
+
+<div id="app" class="admin-shell hidden">
+  <div id="nav"></div>
+  <main class="admin-content">
+    <div class="admin-content__inner">
+      <div class="row" style="justify-content: space-between;">
+        <h1>Розпродажі</h1>
+        <a class="button primary" href="/admin/upload">+ Додати розпродаж</a>
+      </div>
+
+      <section>
+        <div class="row" style="justify-content: space-between;">
+          <span class="hint">Термін дії, активність і видалення розпродажів</span>
+          <button id="reloadSales" class="secondary" type="button">Оновити</button>
+        </div>
+        <div id="salesList"></div>
+        <div id="salesStatus" class="status"></div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script src="/assets/admin.js"></script>
+<script>
+  const loginStatus = document.getElementById('loginStatus');
+  const salesList = document.getElementById('salesList');
+  const salesStatus = document.getElementById('salesStatus');
+  const reloadSalesBtn = document.getElementById('reloadSales');
+
+  const ERROR_MESSAGES = {
+    forbidden: 'Цей Google-акаунт не має доступу до адмінки.',
+    invalid_state: 'Сесія входу застаріла, спробуй ще раз.',
+    email_not_verified: 'Пошта Google-акаунта не підтверджена.',
+    token_exchange_failed: 'Не вдалося завершити вхід через Google.',
+  };
+
+  (function showLoginError() {
+    const params = new URLSearchParams(location.search);
+    const error = params.get('error');
+    if (error) {
+      loginStatus.textContent = ERROR_MESSAGES[error] || ('Помилка входу: ' + error);
+      history.replaceState(null, '', location.pathname);
+    }
+  })();
+
+  async function loadSales() {
+    AdminShared.setStatus(salesStatus, 'pending', 'Завантаження...');
+    try {
+      const res = await fetch('/api/sales', { cache: 'no-store', credentials: 'include' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      const sales = await res.json();
+      renderSales(sales);
+      salesStatus.className = 'status';
+    } catch (err) {
+      AdminShared.setStatus(salesStatus, 'err', 'Помилка: ' + err.message);
+    }
+  }
+
+  function renderSales(sales) {
+    salesList.innerHTML = '';
+    if (sales.length === 0) {
+      salesList.innerHTML = `<div class="empty-state">${AdminShared.icon('inbox', 32)}<p>Ще немає жодного залитого товару. Натисни "Додати розпродаж".</p></div>`;
+      return;
+    }
+
+    sales.forEach((sale) => {
+      const row = document.createElement('div');
+      row.className = 'sale-row';
+
+      const name = document.createElement('span');
+      name.className = 'sale-row__name';
+      name.textContent = sale.saleId;
+
+      const badge = document.createElement('span');
+      badge.className = 'sale-row__badge ' + (sale.active ? 'active' : 'stopped');
+      badge.textContent = sale.active ? 'Активний' : 'Зупинений';
+
+      const dateInput = document.createElement('input');
+      dateInput.type = 'date';
+      dateInput.value = sale.endDate ? sale.endDate.slice(0, 10) : '';
+
+      const saveBtn = document.createElement('button');
+      saveBtn.type = 'button';
+      saveBtn.className = 'secondary';
+      saveBtn.textContent = 'Зберегти дату';
+      saveBtn.addEventListener('click', () => saveSale(sale.saleId, dateInput.value || null, sale.active));
+
+      const toggleBtn = document.createElement('button');
+      toggleBtn.type = 'button';
+      toggleBtn.className = sale.active ? 'danger' : 'secondary';
+      toggleBtn.textContent = sale.active ? 'Зупинити розпродаж' : 'Відновити';
+      toggleBtn.addEventListener('click', () => saveSale(sale.saleId, dateInput.value || null, !sale.active));
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'danger';
+      deleteBtn.textContent = 'Видалити';
+      deleteBtn.addEventListener('click', () => deleteSale(sale.saleId));
+
+      row.append(name, badge, dateInput, saveBtn, toggleBtn, deleteBtn);
+      salesList.appendChild(row);
+    });
+  }
+
+  async function saveSale(saleId, endDate, active) {
+    AdminShared.setStatus(salesStatus, 'pending', 'Збереження...');
+    try {
+      const res = await fetch('/api/sales', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ saleId, endDate, active }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      AdminShared.setStatus(salesStatus, 'ok', 'Збережено.');
+      loadSales();
+    } catch (err) {
+      AdminShared.setStatus(salesStatus, 'err', 'Помилка: ' + err.message);
+    }
+  }
+
+  async function deleteSale(saleId) {
+    if (!confirm(`Видалити розпродаж "${saleId}" і всі його товари? Це незворотньо.`)) return;
+    AdminShared.setStatus(salesStatus, 'pending', 'Видалення...');
+    try {
+      const res = await fetch(`/api/sales?saleId=${encodeURIComponent(saleId)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      AdminShared.setStatus(salesStatus, 'ok', `Видалено. Товарів прибрано: ${body.removedProducts ?? 0}.`);
+      loadSales();
+    } catch (err) {
+      AdminShared.setStatus(salesStatus, 'err', 'Помилка: ' + err.message);
+    }
+  }
+
+  reloadSalesBtn.addEventListener('click', loadSales);
+
+  AdminShared.init('sales').then((email) => {
+    if (email) loadSales();
+  });
+</script>
+</body>
+</html>

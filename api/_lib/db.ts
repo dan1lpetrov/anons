@@ -52,6 +52,15 @@ export async function ensureSchema(): Promise<void> {
         await client.query(`
           CREATE INDEX IF NOT EXISTS product_events_user_lookup ON product_events (telegram_user_id, created_at);
         `);
+        await client.query(`ALTER TABLE product_events ADD COLUMN IF NOT EXISTS order_id TEXT;`);
+        await client.query(`ALTER TABLE product_events ADD COLUMN IF NOT EXISTS quantity INTEGER;`);
+        await client.query(`ALTER TABLE product_events ADD COLUMN IF NOT EXISTS unit_price NUMERIC;`);
+        await client.query(`
+          CREATE INDEX IF NOT EXISTS product_events_order_lookup ON product_events (order_id);
+        `);
+        await client.query(`
+          CREATE INDEX IF NOT EXISTS product_events_created_at ON product_events (created_at);
+        `);
         await client.query(`
           CREATE TABLE IF NOT EXISTS product_scores (
             product_id TEXT PRIMARY KEY,

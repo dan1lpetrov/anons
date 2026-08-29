@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="robots" content="noindex, nofollow" />
-<title>Anons — Адмінка</title>
+<title>Anons — Дашборд</title>
 <script>(function(){try{var t=localStorage.getItem('anons-admin-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -24,20 +24,72 @@
 <div id="app" class="admin-shell hidden">
   <div id="nav"></div>
   <main class="admin-content">
-    <div class="admin-content__inner">
-      <div class="row" style="justify-content: space-between;">
-        <h1>Розпродажі</h1>
-        <a class="button primary" href="/admin/upload">+ Додати розпродаж</a>
+    <div class="admin-content__inner admin-content__inner--wide">
+
+      <div class="dash-header">
+        <div>
+          <h1>Дашборд</h1>
+          <p class="hint">Огляд магазину</p>
+        </div>
+        <div class="range-pills" id="rangePills">
+          <button class="range-pill" type="button" data-days="7">7 днів</button>
+          <button class="range-pill active" type="button" data-days="30">30 днів</button>
+          <button class="range-pill" type="button" data-days="90">90 днів</button>
+        </div>
       </div>
 
-      <section>
-        <div class="row" style="justify-content: space-between;">
-          <span class="hint">Термін дії, активність і видалення розпродажів</span>
-          <button id="reloadSales" class="secondary" type="button">Оновити</button>
+      <div id="dashStatus" class="status"></div>
+
+      <div class="kpi-grid" id="kpiGrid"></div>
+
+      <div class="dash-row">
+        <section class="card">
+          <div class="card__head">
+            <span class="card__title">Активність за тижнем</span>
+            <span class="hint" style="font-size: 12px;">перегляди + замовлення</span>
+          </div>
+          <div id="heatmap"></div>
+        </section>
+
+        <div class="dash-col">
+          <section class="card">
+            <div class="card__head">
+              <span class="card__title">Розпродажі, що завершуються</span>
+              <a href="/admin/sales" class="card__link">усі<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a>
+            </div>
+            <div id="salesEndingList"></div>
+          </section>
+
+          <section class="card">
+            <div class="card__head">
+              <span class="card__title">Товари за брендом</span>
+            </div>
+            <div id="brandsList"></div>
+          </section>
         </div>
-        <div id="salesList"></div>
-        <div id="salesStatus" class="status"></div>
+      </div>
+
+      <section class="card">
+        <div class="card__head">
+          <span class="card__title">Топ товари за рейтингом</span>
+          <span class="hint" style="font-size: 12px;">score = знижка + історія ціни + перегляди + замовлення + тренд</span>
+        </div>
+        <div style="overflow-x: auto;">
+          <table class="dash-table">
+            <thead>
+              <tr>
+                <th>Товар</th>
+                <th class="num">Знижка</th>
+                <th class="num">Перегляди</th>
+                <th class="num">Замовлення</th>
+                <th class="num">Score</th>
+              </tr>
+            </thead>
+            <tbody id="topProductsBody"></tbody>
+          </table>
+        </div>
       </section>
+
     </div>
   </main>
 </div>
@@ -45,9 +97,13 @@
 <script src="/assets/admin.js"></script>
 <script>
   const loginStatus = document.getElementById('loginStatus');
-  const salesList = document.getElementById('salesList');
-  const salesStatus = document.getElementById('salesStatus');
-  const reloadSalesBtn = document.getElementById('reloadSales');
+  const dashStatus = document.getElementById('dashStatus');
+  const rangePills = document.getElementById('rangePills');
+  const kpiGrid = document.getElementById('kpiGrid');
+  const heatmapEl = document.getElementById('heatmap');
+  const salesEndingList = document.getElementById('salesEndingList');
+  const brandsList = document.getElementById('brandsList');
+  const topProductsBody = document.getElementById('topProductsBody');
 
   const ERROR_MESSAGES = {
     forbidden: 'Цей Google-акаунт не має доступу до адмінки.',
@@ -65,107 +121,245 @@
     }
   })();
 
-  async function loadSales() {
-    AdminShared.setStatus(salesStatus, 'pending', 'Завантаження...');
+  const DAY_LABELS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
+  const HOUR_LABELS = ['00–04', '04–08', '08–12', '12–16', '16–20', '20–24'];
+
+  function fmtNum(n) {
+    return Math.round(n).toLocaleString('en-US');
+  }
+
+  function fmtMoney(n) {
+    return '$' + fmtNum(n);
+  }
+
+  function deltaBadge(deltaPct) {
+    if (deltaPct === null) return `<span class="kpi-card__delta flat">нове</span>`;
+    const rounded = Math.round(deltaPct * 10) / 10;
+    if (Math.abs(rounded) < 0.05) return `<span class="kpi-card__delta flat">0%</span>`;
+    const up = rounded > 0;
+    const icon = AdminShared.icon(up ? 'trendingUp' : 'trendingDown', 12);
+    const sign = up ? '+' : '−';
+    return `<span class="kpi-card__delta ${up ? 'up' : 'down'}">${icon}${sign}${Math.abs(rounded)}%</span>`;
+  }
+
+  function deltaPtsBadge(deltaPts) {
+    const rounded = Math.round(deltaPts * 10) / 10;
+    if (Math.abs(rounded) < 0.05) return `<span class="kpi-card__delta flat">0 п.п.</span>`;
+    const up = rounded > 0;
+    const icon = AdminShared.icon(up ? 'trendingUp' : 'trendingDown', 12);
+    const sign = up ? '+' : '−';
+    return `<span class="kpi-card__delta ${up ? 'up' : 'down'}">${icon}${sign}${Math.abs(rounded)} п.п.</span>`;
+  }
+
+  function sparkline(series, colorVar) {
+    if (!series || series.length < 2) return '';
+    const w = 64, h = 22, pad = 2;
+    const min = Math.min(...series);
+    const max = Math.max(...series);
+    const range = max - min || 1;
+    const points = series
+      .map((v, i) => {
+        const x = (i / (series.length - 1)) * (w - pad * 2) + pad;
+        const y = h - pad - ((v - min) / range) * (h - pad * 2);
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      })
+      .join(' ');
+    return `<svg class="kpi-card__spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${points}" fill="none" stroke="${colorVar}" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  }
+
+  function kpiCard({ label, icon, value, deltaHtml, spark, note }) {
+    return `
+      <div class="kpi-card">
+        <div class="kpi-card__top">
+          <span class="kpi-card__label">${label}</span>
+          <span class="kpi-card__icon">${AdminShared.icon(icon, 15)}</span>
+        </div>
+        <div class="kpi-card__value">${value}</div>
+        <div class="kpi-card__bottom">${deltaHtml}${spark}</div>
+        ${note ? `<div class="kpi-card__note">${note}</div>` : ''}
+      </div>
+    `;
+  }
+
+  function renderKpi(kpi, series) {
+    const convDown = kpi.conversion.deltaPts < 0;
+    kpiGrid.innerHTML = [
+      kpiCard({
+        label: 'Замовлення (заявки)',
+        icon: 'shoppingBag',
+        value: fmtNum(kpi.orders.value),
+        deltaHtml: deltaBadge(kpi.orders.deltaPct),
+        spark: sparkline(series.orders, 'var(--accent)'),
+      }),
+      kpiCard({
+        label: 'Оціночна сума замовлень',
+        icon: 'dollarSign',
+        value: fmtMoney(kpi.revenue.value),
+        deltaHtml: deltaBadge(kpi.revenue.deltaPct),
+        spark: sparkline(series.revenue, 'var(--accent)'),
+        note: 'за ціною товару на момент замовлення',
+      }),
+      kpiCard({
+        label: 'Перегляди товарів',
+        icon: 'eye',
+        value: fmtNum(kpi.views.value),
+        deltaHtml: deltaBadge(kpi.views.deltaPct),
+        spark: sparkline(series.views, 'var(--accent)'),
+      }),
+      kpiCard({
+        label: 'Конверсія перегляд → замовлення',
+        icon: 'percent',
+        value: kpi.conversion.value.toFixed(1) + '%',
+        deltaHtml: deltaPtsBadge(kpi.conversion.deltaPts),
+        spark: sparkline(series.orders, convDown ? 'var(--danger)' : 'var(--accent)'),
+      }),
+    ].join('');
+  }
+
+  function renderHeatmap(heatmap) {
+    const { cells, max } = heatmap;
+    let html = `<div class="heatmap"><div></div>`;
+    DAY_LABELS.forEach((d) => (html += `<div class="heatmap__daylabel">${d}</div>`));
+    HOUR_LABELS.forEach((hourLabel, bucket) => {
+      html += `<div class="heatmap__hourlabel">${hourLabel}</div>`;
+      for (let day = 0; day < 7; day++) {
+        const count = cells[bucket][day];
+        const lvl = max > 0 ? 0.04 + 0.88 * (count / max) : 0.04;
+        html += `<div class="heatmap__cell" style="--lvl:${lvl.toFixed(3)}"><span class="heatmap__tip">${DAY_LABELS[day]} ${hourLabel}<br><b>${count}</b> подій</span></div>`;
+      }
+    });
+    html += `</div>
+      <div class="heatmap__legend">
+        <span>менше</span>
+        <span class="heatmap__legend-ramp">
+          ${[0.04, 0.16, 0.28, 0.46, 0.68, 0.92].map((a) => `<span style="background:rgba(var(--accent-rgb),${a})"></span>`).join('')}
+        </span>
+        <span>більше</span>
+      </div>`;
+    heatmapEl.innerHTML = html;
+  }
+
+  function saleBadge(daysLeft) {
+    if (daysLeft === null) return `<span class="badge success">активний</span>`;
+    if (daysLeft <= 3) return `<span class="badge danger">${daysLeft} ${plural(daysLeft, 'день', 'дні', 'днів')}</span>`;
+    if (daysLeft <= 10) return `<span class="badge warning">${daysLeft} ${plural(daysLeft, 'день', 'дні', 'днів')}</span>`;
+    return `<span class="badge neutral">${daysLeft} ${plural(daysLeft, 'день', 'дні', 'днів')}</span>`;
+  }
+
+  function plural(n, one, few, many) {
+    const mod10 = n % 10, mod100 = n % 100;
+    if (mod10 === 1 && mod100 !== 11) return one;
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return few;
+    return many;
+  }
+
+  function renderSalesEnding(list) {
+    if (list.length === 0) {
+      salesEndingList.innerHTML = `<div class="empty-state">${AdminShared.icon('inbox', 28)}<p>Немає активних розпродажів.</p></div>`;
+      return;
+    }
+    salesEndingList.innerHTML = list
+      .map(
+        (s) => `
+      <div class="list-row">
+        <div>
+          <div class="list-row__name">${s.saleId}</div>
+          <div class="list-row__sub">${s.endDate ? 'завершення ' + new Date(s.endDate).toLocaleDateString('uk-UA') : 'дата не встановлена'}</div>
+        </div>
+        ${saleBadge(s.daysLeft)}
+      </div>`,
+      )
+      .join('');
+  }
+
+  function renderBrands(list) {
+    if (list.length === 0) {
+      brandsList.innerHTML = `<div class="empty-state">${AdminShared.icon('inbox', 28)}<p>Немає товарів у каталозі.</p></div>`;
+      return;
+    }
+    const max = Math.max(...list.map((b) => b.count));
+    brandsList.innerHTML = list
+      .map(
+        (b) => `
+      <div class="brand-row">
+        <div class="brand-row__top"><span class="brand-row__name">${b.saleId}</span><span class="brand-row__count">${fmtNum(b.count)}</span></div>
+        <div class="brand-row__track"><div class="brand-row__fill" style="width:${max > 0 ? (b.count / max) * 100 : 0}%"></div></div>
+      </div>`,
+      )
+      .join('');
+  }
+
+  function renderTopProducts(list) {
+    if (list.length === 0) {
+      topProductsBody.innerHTML = `<tr><td colspan="5"><div class="empty-state">${AdminShared.icon('inbox', 28)}<p>Ще немає рейтингу товарів — з'явиться після першого перерахунку.</p></div></td></tr>`;
+      return;
+    }
+    topProductsBody.innerHTML = list
+      .map((p) => {
+        const scorePct = p.score !== null ? Math.round(p.score * 100) : 0;
+        return `
+      <tr>
+        <td>
+          <div class="prod-cell">
+            <div class="prod-thumb">${p.saleId.slice(0, 2)}</div>
+            <div>
+              <div class="prod-name">${escapeHtml(p.name)}</div>
+              <div class="prod-brand">${p.saleId}</div>
+            </div>
+          </div>
+        </td>
+        <td class="num">${p.discountPct}%</td>
+        <td class="num">${fmtNum(p.views)}</td>
+        <td class="num">${fmtNum(p.orders)}</td>
+        <td class="num">
+          <div class="score-cell">
+            <div class="score-bar"><div class="score-bar__fill" style="width:${scorePct}%"></div></div>
+            <span class="score-num">${p.score !== null ? p.score.toFixed(2) : '—'}</span>
+          </div>
+        </td>
+      </tr>`;
+      })
+      .join('');
+  }
+
+  function escapeHtml(s) {
+    const div = document.createElement('div');
+    div.textContent = s;
+    return div.innerHTML;
+  }
+
+  let currentDays = 30;
+
+  async function loadDashboard() {
+    AdminShared.setStatus(dashStatus, 'pending', 'Завантаження...');
     try {
-      const res = await fetch('/api/sales', { cache: 'no-store', credentials: 'include' });
+      const res = await fetch(`/api/events?dashboard=1&days=${currentDays}`, { cache: 'no-store', credentials: 'include' });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `HTTP ${res.status}`);
       }
-      const sales = await res.json();
-      renderSales(sales);
-      salesStatus.className = 'status';
+      const data = await res.json();
+      renderKpi(data.kpi, data.series);
+      renderHeatmap(data.heatmap);
+      renderSalesEnding(data.salesEnding);
+      renderBrands(data.brands);
+      renderTopProducts(data.topProducts);
+      dashStatus.className = 'status';
     } catch (err) {
-      AdminShared.setStatus(salesStatus, 'err', 'Помилка: ' + err.message);
+      AdminShared.setStatus(dashStatus, 'err', 'Помилка: ' + err.message);
     }
   }
 
-  function renderSales(sales) {
-    salesList.innerHTML = '';
-    if (sales.length === 0) {
-      salesList.innerHTML = `<div class="empty-state">${AdminShared.icon('inbox', 32)}<p>Ще немає жодного залитого товару. Натисни "Додати розпродаж".</p></div>`;
-      return;
-    }
+  rangePills.addEventListener('click', (e) => {
+    const btn = e.target.closest('.range-pill');
+    if (!btn) return;
+    currentDays = Number(btn.dataset.days);
+    rangePills.querySelectorAll('.range-pill').forEach((b) => b.classList.toggle('active', b === btn));
+    loadDashboard();
+  });
 
-    sales.forEach((sale) => {
-      const row = document.createElement('div');
-      row.className = 'sale-row';
-
-      const name = document.createElement('span');
-      name.className = 'sale-row__name';
-      name.textContent = sale.saleId;
-
-      const badge = document.createElement('span');
-      badge.className = 'sale-row__badge ' + (sale.active ? 'active' : 'stopped');
-      badge.textContent = sale.active ? 'Активний' : 'Зупинений';
-
-      const dateInput = document.createElement('input');
-      dateInput.type = 'date';
-      dateInput.value = sale.endDate ? sale.endDate.slice(0, 10) : '';
-
-      const saveBtn = document.createElement('button');
-      saveBtn.type = 'button';
-      saveBtn.className = 'secondary';
-      saveBtn.textContent = 'Зберегти дату';
-      saveBtn.addEventListener('click', () => saveSale(sale.saleId, dateInput.value || null, sale.active));
-
-      const toggleBtn = document.createElement('button');
-      toggleBtn.type = 'button';
-      toggleBtn.className = sale.active ? 'danger' : 'secondary';
-      toggleBtn.textContent = sale.active ? 'Зупинити розпродаж' : 'Відновити';
-      toggleBtn.addEventListener('click', () => saveSale(sale.saleId, dateInput.value || null, !sale.active));
-
-      const deleteBtn = document.createElement('button');
-      deleteBtn.type = 'button';
-      deleteBtn.className = 'danger';
-      deleteBtn.textContent = 'Видалити';
-      deleteBtn.addEventListener('click', () => deleteSale(sale.saleId));
-
-      row.append(name, badge, dateInput, saveBtn, toggleBtn, deleteBtn);
-      salesList.appendChild(row);
-    });
-  }
-
-  async function saveSale(saleId, endDate, active) {
-    AdminShared.setStatus(salesStatus, 'pending', 'Збереження...');
-    try {
-      const res = await fetch('/api/sales', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ saleId, endDate, active }),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-      AdminShared.setStatus(salesStatus, 'ok', 'Збережено.');
-      loadSales();
-    } catch (err) {
-      AdminShared.setStatus(salesStatus, 'err', 'Помилка: ' + err.message);
-    }
-  }
-
-  async function deleteSale(saleId) {
-    if (!confirm(`Видалити розпродаж "${saleId}" і всі його товари? Це незворотньо.`)) return;
-    AdminShared.setStatus(salesStatus, 'pending', 'Видалення...');
-    try {
-      const res = await fetch(`/api/sales?saleId=${encodeURIComponent(saleId)}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-      AdminShared.setStatus(salesStatus, 'ok', `Видалено. Товарів прибрано: ${body.removedProducts ?? 0}.`);
-      loadSales();
-    } catch (err) {
-      AdminShared.setStatus(salesStatus, 'err', 'Помилка: ' + err.message);
-    }
-  }
-
-  reloadSalesBtn.addEventListener('click', loadSales);
-
-  AdminShared.init('sales').then((email) => {
-    if (email) loadSales();
+  AdminShared.init('dashboard').then((email) => {
+    if (email) loadDashboard();
   });
 </script>
 </body>

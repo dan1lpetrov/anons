@@ -1,6 +1,7 @@
 {
   "rewrites": [
     { "source": "/admin", "destination": "/admin.html" },
+    { "source": "/admin/sales", "destination": "/admin-sales.html" },
     { "source": "/admin/upload", "destination": "/admin-upload.html" },
     { "source": "/admin/weights", "destination": "/admin-weights.html" },
     { "source": "/admin/banners", "destination": "/admin-banners.html" },

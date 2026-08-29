@@ -47,7 +47,7 @@
       </div>
 
       <section id="addSection">
-        <h2>Додати банер</h2>
+        <h2 id="formTitle">Додати банер</h2>
         <div class="banner-form-grid">
           <div class="full">
             <label for="newImageUrl">URL картинки</label>
@@ -76,6 +76,7 @@
         </div>
         <div class="row">
           <button id="addBanner" class="primary" type="button">Додати банер</button>
+          <button id="cancelEdit" class="secondary hidden" type="button">Скасувати</button>
         </div>
         <div id="addStatus" class="status"></div>
       </section>
@@ -102,10 +103,43 @@
   const addActive = document.getElementById('newActive');
   const addStatus = document.getElementById('addStatus');
   const addBtn = document.getElementById('addBanner');
+  const cancelEditBtn = document.getElementById('cancelEdit');
+  const formTitle = document.getElementById('formTitle');
 
   const bannersList = document.getElementById('bannersList');
   const listStatus = document.getElementById('listStatus');
   const reloadBtn = document.getElementById('reloadBanners');
+
+  let editingId = null;
+
+  function startEdit(banner) {
+    editingId = banner.id;
+    addImageUrl.value = banner.imageUrl || '';
+    addTitle.value = banner.title || '';
+    addSubtitle.value = banner.subtitle || '';
+    addCategory.value = banner.linkCategoryId || '';
+    addOrder.value = String(banner.sortOrder ?? 0);
+    addActive.checked = !!banner.active;
+    formTitle.textContent = 'Редагувати банер';
+    addBtn.textContent = 'Зберегти зміни';
+    cancelEditBtn.classList.remove('hidden');
+    addStatus.className = 'status';
+    addStatus.textContent = '';
+    addImageUrl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function stopEdit() {
+    editingId = null;
+    addImageUrl.value = '';
+    addTitle.value = '';
+    addSubtitle.value = '';
+    addCategory.value = '';
+    addOrder.value = '0';
+    addActive.checked = true;
+    formTitle.textContent = 'Додати банер';
+    addBtn.textContent = 'Додати банер';
+    cancelEditBtn.classList.add('hidden');
+  }
 
   async function loadBanners() {
     AdminShared.setStatus(listStatus, 'pending', 'Завантаження...');
@@ -152,6 +186,12 @@
       const actions = document.createElement('div');
       actions.className = 'banner-row__actions';
 
+      const editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.className = 'secondary';
+      editBtn.textContent = 'Редагувати';
+      editBtn.addEventListener('click', () => startEdit(banner));
+
       const toggleBtn = document.createElement('button');
       toggleBtn.type = 'button';
       toggleBtn.className = 'secondary';
@@ -164,7 +204,7 @@
       deleteBtn.textContent = 'Видалити';
       deleteBtn.addEventListener('click', () => deleteBanner(banner.id));
 
-      actions.append(toggleBtn, deleteBtn);
+      actions.append(editBtn, toggleBtn, deleteBtn);
       row.append(thumb, body, actions);
       bannersList.appendChild(row);
     });
@@ -210,10 +250,12 @@
       AdminShared.setStatus(addStatus, 'err', 'URL картинки обовʼязковий.');
       return;
     }
+    const isEdit = editingId !== null;
     addBtn.disabled = true;
     try {
-      AdminShared.setStatus(addStatus, 'pending', 'Додавання...');
+      AdminShared.setStatus(addStatus, 'pending', isEdit ? 'Збереження...' : 'Додавання...');
       await saveBanner({
+        ...(isEdit ? { id: editingId } : {}),
         imageUrl: addImageUrl.value.trim(),
         title: addTitle.value.trim(),
         subtitle: addSubtitle.value.trim(),
@@ -221,18 +263,19 @@
         sortOrder: Number(addOrder.value) || 0,
         active: addActive.checked,
       });
-      addImageUrl.value = '';
-      addTitle.value = '';
-      addSubtitle.value = '';
-      addCategory.value = '';
-      addOrder.value = '0';
-      addActive.checked = true;
-      AdminShared.setStatus(addStatus, 'ok', 'Додано.');
+      stopEdit();
+      AdminShared.setStatus(addStatus, 'ok', isEdit ? 'Збережено.' : 'Додано.');
     } catch (err) {
       AdminShared.setStatus(addStatus, 'err', 'Помилка: ' + err.message);
     } finally {
       addBtn.disabled = false;
     }
+  });
+
+  cancelEditBtn.addEventListener('click', () => {
+    stopEdit();
+    addStatus.className = 'status';
+    addStatus.textContent = '';
   });
 
   reloadBtn.addEventListener('click', loadBanners);

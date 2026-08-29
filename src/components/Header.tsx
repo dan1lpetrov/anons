@@ -36,14 +36,18 @@ export function Header({
 
   // Mobile keyboards don't dismiss themselves when the user starts scrolling
   // the page — do it manually so the keyboard doesn't cover content underneath.
+  // Listening on 'scroll' doesn't work inside Telegram's iOS WebView: iOS only
+  // honors a keyboard-dismissing blur() when it's triggered from a direct,
+  // trusted touch event, and 'scroll' fires later/async (often during momentum),
+  // which iOS doesn't count as one. 'touchmove' fires the instant the drag starts.
   useEffect(() => {
-    const handleScroll = () => {
+    const handleTouchMove = () => {
       if (document.activeElement === searchInputRef.current) {
         dismissKeyboard();
       }
     };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+    return () => window.removeEventListener('touchmove', handleTouchMove);
   }, []);
 
   return (

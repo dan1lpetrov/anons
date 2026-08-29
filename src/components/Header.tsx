@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { Search, X } from 'lucide-react';
 
 interface HeaderProps {
@@ -15,6 +16,20 @@ export function Header({
   onSearchFocus,
   onHomeClick,
 }: HeaderProps) {
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Mobile keyboards don't dismiss themselves when the user starts scrolling
+  // the page — do it manually so the keyboard doesn't cover content underneath.
+  useEffect(() => {
+    const handleScroll = () => {
+      if (document.activeElement === searchInputRef.current) {
+        searchInputRef.current?.blur();
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   return (
     <header className="app-header-wrap">
       <div className="app-header">
@@ -25,9 +40,13 @@ export function Header({
           <label className="catalog-search app-header__search">
             <Search size={18} strokeWidth={2} aria-hidden="true" />
             <input
+              ref={searchInputRef}
               value={searchValue}
               onChange={(event) => onSearchChange(event.target.value)}
               onFocus={onSearchFocus}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') event.currentTarget.blur();
+              }}
               type="search"
               placeholder="Пошук товарів..."
             />

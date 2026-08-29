@@ -56,6 +56,10 @@
     token_exchange_failed: 'Не вдалося завершити вхід через Google.',
   };
 
+  const BANK_NAMES = { mono: 'Monobank', privat: 'ПриватБанк', pumb: 'ПУМБ', sens: 'Sense Bank' };
+  const MANUAL_RATE_BANKS = new Set(['pumb', 'sens']);
+  const AUTO_RATE_BANKS = new Set(['mono', 'privat']);
+
   (function showLoginError() {
     const params = new URLSearchParams(location.search);
     const error = params.get('error');
@@ -87,8 +91,6 @@
       salesList.innerHTML = `<div class="empty-state">${AdminShared.icon('inbox', 32)}<p>Ще немає жодного залитого товару. Натисни "Додати розпродаж".</p></div>`;
       return;
     }
-
-    const BANK_NAMES = { mono: 'Monobank', privat: 'ПриватБанк', pumb: 'ПУМБ', sens: 'Sense Bank' };
 
     sales.forEach((sale) => {
       const row = document.createElement('div');
@@ -165,9 +167,6 @@
       sale.displayCurrency === 'uah' ? `грн (${BANK_NAMES[sale.uahBank] || sale.uahBank}, курс ${sale.uahRate})` : 'USD',
     ].join(' · ');
   }
-
-  const MANUAL_RATE_BANKS = new Set(['pumb', 'sens']);
-  const AUTO_RATE_BANKS = new Set(['mono', 'privat']);
 
   // Every campaign has its own editable set of conditions (commission/discount/currency/bank/
   // rate) — building this per sale-row rather than sharing one global form keeps that explicit.

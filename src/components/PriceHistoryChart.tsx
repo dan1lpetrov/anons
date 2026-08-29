@@ -129,23 +129,27 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
             <line className="price-history__gridline" x1={0} y1={maxY} x2={WIDTH} y2={maxY} />
             <line className="price-history__gridline" x1={0} y1={minY} x2={WIDTH} y2={minY} />
             <path className="price-history__line" d={stepPath} fill="none" />
-            {coords.map((c, i) => (
-              <circle
-                key={i}
-                className={`price-history__dot ${activeIndex === i ? 'price-history__dot--active' : ''}`}
-                cx={markerX[i]}
-                cy={c.y}
-                r={activeIndex === i ? 5 : 3}
-              />
-            ))}
           </svg>
+          {/* Rendered as HTML, not SVG <circle>, because the chart stretches
+              the viewBox non-uniformly (preserveAspectRatio="none") to fill
+              its responsive width — an SVG circle would stretch into an
+              ellipse along with it. */}
+          {coords.map((c, i) => (
+            <span
+              key={i}
+              className={`price-history__dot ${activeIndex === i ? 'price-history__dot--active' : ''}`}
+              style={{ left: `${(markerX[i] / WIDTH) * 100}%`, top: `${(c.y / HEIGHT) * 100}%` }}
+            />
+          ))}
           {active && (
             <div
               className="price-history__tooltip"
               style={{
                 left: `${(markerX[activeIndex as number] / WIDTH) * 100}%`,
                 top: `${(active.y / HEIGHT) * 100}%`,
-                transform: `translate(${markerX[activeIndex as number] < WIDTH / 2 ? '4px' : 'calc(-100% - 4px)'}, -50%)`,
+                transform: `translate(${
+                  markerX[activeIndex as number] < WIDTH / 2 ? '4px' : 'calc(-100% - 4px)'
+                }, ${active.y < HEIGHT / 2 ? '8px' : 'calc(-100% - 8px)'})`,
               }}
             >
               <strong>{formatPrice(active.price)}</strong>

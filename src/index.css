@@ -211,6 +211,7 @@ img {
   display: flex;
   gap: 8px;
   overflow-x: auto;
+  margin-top: 12px;
   padding-bottom: 12px;
   margin-bottom: 8px;
   scrollbar-width: none;
@@ -660,11 +661,19 @@ img {
 }
 
 .price-history__dot {
-  fill: var(--tg-button);
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--tg-button);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
 }
 
 .price-history__dot--active {
-  fill: var(--tg-text);
+  width: 10px;
+  height: 10px;
+  background: var(--tg-text);
 }
 
 .price-history__gridlabel {
@@ -1358,6 +1367,24 @@ img {
     max-height: min(80vh, 620px);
     border-radius: 20px;
     animation: sheet-in 0.2s ease-out;
+  }
+
+  /* Past mobile widths, edge-to-edge full-bleed media reads as broken, not
+     intentional — contain it within the content column and round it like
+     every other card instead. */
+  .home-banner {
+    margin: 4px 0 0;
+  }
+
+  .home-banner__slide {
+    aspect-ratio: 21 / 9;
+    max-height: 220px;
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .home-category-tile {
+    flex: 0 0 200px;
   }
 }
 

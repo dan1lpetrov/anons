@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Banner } from '../types';
 
 interface BannerCarouselProps {
@@ -6,17 +6,32 @@ interface BannerCarouselProps {
   onSelect: (linkCategoryId: string | null) => void;
 }
 
+const AUTO_ADVANCE_MS = 4500;
+
 export function BannerCarousel({ banners, onSelect }: BannerCarouselProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
-
-  if (banners.length === 0) return null;
 
   const handleScroll = () => {
     const track = trackRef.current;
     if (!track || track.clientWidth === 0) return;
     setActiveIndex(Math.round(track.scrollLeft / track.clientWidth));
   };
+
+  // Re-armed on every activeIndex change, so a manual swipe pushes the next
+  // auto-advance out by a full interval instead of fighting the user's scroll.
+  useEffect(() => {
+    if (banners.length < 2) return;
+    const timer = setInterval(() => {
+      const track = trackRef.current;
+      if (!track || track.clientWidth === 0) return;
+      const nextIndex = (activeIndex + 1) % banners.length;
+      track.scrollTo({ left: nextIndex * track.clientWidth, behavior: 'smooth' });
+    }, AUTO_ADVANCE_MS);
+    return () => clearInterval(timer);
+  }, [activeIndex, banners.length]);
+
+  if (banners.length === 0) return null;
 
   return (
     <div className="home-banner">

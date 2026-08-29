@@ -18,12 +18,28 @@ export function Header({
 }: HeaderProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  // Plain .blur() doesn't reliably dismiss the on-screen keyboard inside
+  // Telegram's iOS WebView — it keeps the field logically focused for layout
+  // purposes. Toggling readonly/disabled forces the native responder to
+  // actually resign before restoring the field so it's still editable next tap.
+  const dismissKeyboard = () => {
+    const input = searchInputRef.current;
+    if (!input) return;
+    input.setAttribute('readonly', 'readonly');
+    input.setAttribute('disabled', 'true');
+    input.blur();
+    setTimeout(() => {
+      input.removeAttribute('readonly');
+      input.removeAttribute('disabled');
+    }, 100);
+  };
+
   // Mobile keyboards don't dismiss themselves when the user starts scrolling
   // the page — do it manually so the keyboard doesn't cover content underneath.
   useEffect(() => {
     const handleScroll = () => {
       if (document.activeElement === searchInputRef.current) {
-        searchInputRef.current?.blur();
+        dismissKeyboard();
       }
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
@@ -45,7 +61,7 @@ export function Header({
               onChange={(event) => onSearchChange(event.target.value)}
               onFocus={onSearchFocus}
               onKeyDown={(event) => {
-                if (event.key === 'Enter') event.currentTarget.blur();
+                if (event.key === 'Enter') dismissKeyboard();
               }}
               type="search"
               placeholder="Пошук товарів..."

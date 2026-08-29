@@ -46,6 +46,16 @@ Required env vars: `SESSION_SECRET`, `ADMIN_EMAIL`, `GOOGLE_CLIENT_ID`, `GOOGLE_
 
 A "sale" (`sale_windows` table) is a per-`saleId` row with `end_date`/`active`. Products past their sale's `end_date` are excluded by `GET /api/products`'s `WHERE` clause. The admin panel can pause a sale (`active: false`, keeps data) or fully delete one (`DELETE /api/sales?saleId=...`, removes both the `sale_windows` row and every product with that `sale_id` — irreversible).
 
+### Reseller conditions (commission / discount / UAH conversion)
+
+Each campaign (`sale_events` row) also carries reseller pricing conditions: `buyer_commission_percent` (default 10), `additional_discount_percent` (default 0), and `display_currency` (`'original'` = the scraper's USD, or `'uah'` with a `uah_bank` + snapshotted `uah_rate`). `api/_lib/exchangeRates.ts` auto-fetches the rate from mono/privat's public no-auth APIs; ПУМБ/Sense have no such API, so their rate is admin-typed.
+
+The markup formula (`applySaleMarkup` in `api/_lib/pricing.ts`, mirrored in `public/admin-upload.html`'s `applySaleConditions`) is **sequential**: `price × (1 − discount%) × (1 + commission%)`, then `× rate` if `displayCurrency === 'uah'`.
+
+Every `Product`/`ProductColor` now carries `basePrice`/`baseOriginalPrice` (the raw scraped price) alongside the markup-applied `price`/`originalPrice` that's actually displayed/sold. This split is what makes both of the following idempotent instead of compounding the markup on every re-run:
+- **Upload** (`admin-upload.html`): re-derives `price` from `basePrice` under the target campaign's conditions right before `POST /api/products`, whether the pasted JSON is fresh scraper output (no `price` yet) or a reload of already-priced products via "Завантажити поточні товари" (already has `basePrice`, reused as-is). Products uploaded before this feature existed have no `basePrice`; for those, `price` itself is treated as the base (no markup was ever applied).
+- **Editing an existing campaign's conditions** (`/admin/sales`, `POST /api/sales` with `id` + any condition field): `repriceCampaignProducts` in `api/sales.ts` re-derives `price`/`originalPrice` for every product already in that campaign from their stored `basePrice`, inside the same transaction as the `sale_events` update, and logs the changes to `price_history` (`recordPriceChanges`, shared with the upload path, both now living in `api/_lib/pricing.ts`) — so a commission/discount edit takes effect immediately, not just on the next manual re-upload. A plain rename/date/pause save (no condition fields in the request body) skips this entirely — `conditionsProvided` in `handlePost` gates it.
+
 ### Admin dashboard
 
 `/admin` (`public/admin.html`) is a KPI/analytics dashboard, the new landing page for the admin panel — the sale-management list that used to live there moved to `/admin/sales` (`public/admin-sales.html`, otherwise unchanged). Both pages share `public/assets/admin.js`'s nav (`PAGES` array) and `admin.css`'s tokens; the dashboard opts into a wider content column via an `.admin-content__inner--wide` modifier (1180px vs. the 640px default the form-style pages use).

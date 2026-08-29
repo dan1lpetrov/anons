@@ -88,6 +88,8 @@
       return;
     }
 
+    const BANK_NAMES = { mono: 'Monobank', privat: 'ПриватБанк', pumb: 'ПУМБ', sens: 'Sense Bank' };
+
     sales.forEach((sale) => {
       const row = document.createElement('div');
       row.className = 'sale-row';
@@ -135,23 +137,185 @@
       deleteBtn.textContent = 'Видалити';
       deleteBtn.addEventListener('click', () => deleteSale(sale.id, sale.name));
 
-      row.append(brand, nameInput, badge, countLabel, dateInput, saveBtn, toggleBtn, deleteBtn);
+      const conditionsLabel = document.createElement('span');
+      conditionsLabel.className = 'hint';
+      conditionsLabel.style.flexBasis = '100%';
+      conditionsLabel.textContent = formatConditions(sale);
+
+      const conditionsBtn = document.createElement('button');
+      conditionsBtn.type = 'button';
+      conditionsBtn.className = 'secondary';
+      conditionsBtn.textContent = 'Умови';
+
+      const conditionsPanel = buildConditionsPanel(sale, () =>
+        saveSale(sale.id, { name: nameInput.value, endDate: dateInput.value || null, active: sale.active }, readPanelConditions(conditionsPanel)),
+      );
+      conditionsPanel.classList.add('hidden');
+      conditionsBtn.addEventListener('click', () => conditionsPanel.classList.toggle('hidden'));
+
+      row.append(brand, nameInput, badge, countLabel, dateInput, saveBtn, toggleBtn, conditionsBtn, deleteBtn, conditionsLabel, conditionsPanel);
       salesList.appendChild(row);
     });
   }
 
-  async function saveSale(id, { name, endDate, active }) {
-    AdminShared.setStatus(salesStatus, 'pending', 'Збереження...');
+  function formatConditions(sale) {
+    return [
+      `комісія ${sale.buyerCommissionPercent}%`,
+      `знижка ${sale.additionalDiscountPercent}%`,
+      sale.displayCurrency === 'uah' ? `грн (${BANK_NAMES[sale.uahBank] || sale.uahBank}, курс ${sale.uahRate})` : 'USD',
+    ].join(' · ');
+  }
+
+  const MANUAL_RATE_BANKS = new Set(['pumb', 'sens']);
+  const AUTO_RATE_BANKS = new Set(['mono', 'privat']);
+
+  // Every campaign has its own editable set of conditions (commission/discount/currency/bank/
+  // rate) — building this per sale-row rather than sharing one global form keeps that explicit.
+  function buildConditionsPanel(sale, onSave) {
+    const panel = document.createElement('div');
+    panel.className = 'conditions-grid';
+    panel.style.flexBasis = '100%';
+
+    const commissionInput = document.createElement('input');
+    commissionInput.type = 'number';
+    commissionInput.step = '0.1';
+    commissionInput.min = '0';
+    commissionInput.value = sale.buyerCommissionPercent;
+
+    const discountInput = document.createElement('input');
+    discountInput.type = 'number';
+    discountInput.step = '0.1';
+    discountInput.min = '0';
+    discountInput.value = sale.additionalDiscountPercent;
+
+    const currencySelect = document.createElement('select');
+    currencySelect.innerHTML = `
+      <option value="original">Оригінальна (USD)</option>
+      <option value="uah">Гривня (за курсом банку)</option>
+    `;
+    currencySelect.value = sale.displayCurrency;
+
+    const bankSelect = document.createElement('select');
+    bankSelect.innerHTML = `
+      <option value="mono">Monobank (курс — автоматично)</option>
+      <option value="privat">ПриватБанк (курс — автоматично)</option>
+      <option value="pumb">ПУМБ (курс — вручну)</option>
+      <option value="sens">Sense Bank (курс — вручну)</option>
+    `;
+    bankSelect.value = sale.uahBank || 'mono';
+
+    const rateInput = document.createElement('input');
+    rateInput.type = 'number';
+    rateInput.step = '0.0001';
+    rateInput.min = '0';
+    rateInput.placeholder = 'напр. 41.5';
+    if (sale.uahRate) rateInput.value = sale.uahRate;
+
+    const refreshRateBtn = document.createElement('button');
+    refreshRateBtn.type = 'button';
+    refreshRateBtn.className = 'secondary';
+    refreshRateBtn.textContent = 'Оновити курс';
+    refreshRateBtn.addEventListener('click', async () => {
+      refreshRateBtn.disabled = true;
+      try {
+        const res = await fetch(`/api/sales?fetchRate=${encodeURIComponent(bankSelect.value)}`, {
+          cache: 'no-store',
+          credentials: 'include',
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+        rateInput.value = body.rate;
+      } catch (err) {
+        AdminShared.setStatus(salesStatus, 'err', 'Помилка: ' + err.message);
+      } finally {
+        refreshRateBtn.disabled = false;
+      }
+    });
+
+    const rateRow = document.createElement('div');
+    rateRow.className = 'row';
+    rateRow.append(rateInput, refreshRateBtn);
+
+    function updateVisibility() {
+      const isUah = currencySelect.value === 'uah';
+      bankLabel.classList.toggle('hidden', !isUah);
+      bankSelect.classList.toggle('hidden', !isUah);
+      rateLabel.classList.toggle('hidden', !isUah);
+      rateRow.classList.toggle('hidden', !isUah);
+      refreshRateBtn.classList.toggle('hidden', !AUTO_RATE_BANKS.has(bankSelect.value));
+    }
+    currencySelect.addEventListener('change', updateVisibility);
+    bankSelect.addEventListener('change', updateVisibility);
+
+    function labeled(text) {
+      const label = document.createElement('label');
+      label.textContent = text;
+      return label;
+    }
+    const commissionLabel = labeled('Комісія баєра, %');
+    const discountLabel = labeled('Додаткова знижка, %');
+    const currencyLabel = labeled('Валюта показу');
+    const bankLabel = labeled('Банк');
+    const rateLabel = labeled('Курс, ₴ за $1');
+
+    const saveConditionsBtn = document.createElement('button');
+    saveConditionsBtn.type = 'button';
+    saveConditionsBtn.className = 'primary';
+    saveConditionsBtn.textContent = 'Зберегти умови (перерахує ціни товарів)';
+    saveConditionsBtn.addEventListener('click', onSave);
+
+    panel._inputs = { commissionInput, discountInput, currencySelect, bankSelect, rateInput };
+
+    panel.append(
+      commissionLabel,
+      commissionInput,
+      discountLabel,
+      discountInput,
+      currencyLabel,
+      currencySelect,
+      bankLabel,
+      bankSelect,
+      rateLabel,
+      rateRow,
+      document.createElement('div'),
+      saveConditionsBtn,
+    );
+    updateVisibility();
+    return panel;
+  }
+
+  function readPanelConditions(panel) {
+    const { commissionInput, discountInput, currencySelect, bankSelect, rateInput } = panel._inputs;
+    const conditions = {
+      buyerCommissionPercent: Number(commissionInput.value),
+      additionalDiscountPercent: Number(discountInput.value),
+      displayCurrency: currencySelect.value,
+    };
+    if (currencySelect.value === 'uah') {
+      conditions.uahBank = bankSelect.value;
+      if (MANUAL_RATE_BANKS.has(bankSelect.value) || rateInput.value) {
+        conditions.uahRate = Number(rateInput.value);
+      }
+    }
+    return conditions;
+  }
+
+  async function saveSale(id, { name, endDate, active }, conditions) {
+    AdminShared.setStatus(salesStatus, 'pending', conditions ? 'Зберігаю умови й перераховую ціни...' : 'Збереження...');
     try {
       const res = await fetch('/api/sales', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, name, endDate, active }),
+        body: JSON.stringify({ id, name, endDate, active, ...conditions }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-      AdminShared.setStatus(salesStatus, 'ok', 'Збережено.');
+      AdminShared.setStatus(
+        salesStatus,
+        'ok',
+        conditions ? `Збережено. Перераховано цін: ${body.repricedCount ?? 0}.` : 'Збережено.',
+      );
       loadSales();
     } catch (err) {
       AdminShared.setStatus(salesStatus, 'err', 'Помилка: ' + err.message);

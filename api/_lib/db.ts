@@ -64,6 +64,14 @@ async function runEnsureSchema(): Promise<void> {
       await client.query(`
         CREATE INDEX IF NOT EXISTS sale_events_brand ON sale_events (sale_id);
       `);
+      // Reseller conditions, set once at campaign creation (see api/sales.ts / admin-upload.html):
+      // buyer commission %, an extra discount %, and whether to display prices in the sale's own
+      // currency (USD) or convert to UAH using a bank rate snapshotted at upload time.
+      await client.query(`ALTER TABLE sale_events ADD COLUMN IF NOT EXISTS buyer_commission_percent NUMERIC NOT NULL DEFAULT 10;`);
+      await client.query(`ALTER TABLE sale_events ADD COLUMN IF NOT EXISTS additional_discount_percent NUMERIC NOT NULL DEFAULT 0;`);
+      await client.query(`ALTER TABLE sale_events ADD COLUMN IF NOT EXISTS display_currency TEXT NOT NULL DEFAULT 'original';`);
+      await client.query(`ALTER TABLE sale_events ADD COLUMN IF NOT EXISTS uah_bank TEXT;`);
+      await client.query(`ALTER TABLE sale_events ADD COLUMN IF NOT EXISTS uah_rate NUMERIC;`);
       // One-time migration: products.id alone used to be the primary key (one row per SKU,
       // globally). Multiple concurrently-live campaigns per brand means the same SKU can now
       // have one row per campaign it's live in, so the key widens to (id, sale_event_id).

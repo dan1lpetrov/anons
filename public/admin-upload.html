@@ -10,17 +10,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/assets/admin.css" />
-<style>
-  .campaign-option {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--border);
-    font-size: 14px;
-  }
-  .campaign-option:last-child { border-bottom: none; }
-</style>
 </head>
 <body>
 
@@ -56,6 +45,31 @@
         </div>
         <div id="campaignHint" class="hint"></div>
 
+        <div id="conditionsSection" class="hidden" style="margin-top: 16px;">
+          <label>Умови розпродажу</label>
+          <div id="conditionsEditor" class="conditions-grid">
+            <label for="conditionCommission">Комісія баєра, %</label>
+            <input id="conditionCommission" type="number" step="0.1" min="0" value="10" />
+            <label for="conditionDiscount">Додаткова знижка, %</label>
+            <input id="conditionDiscount" type="number" step="0.1" min="0" value="0" />
+            <label for="conditionCurrency">Валюта показу</label>
+            <select id="conditionCurrency">
+              <option value="original">Оригінальна (USD)</option>
+              <option value="uah">Гривня (за курсом банку)</option>
+            </select>
+            <label for="conditionBank" id="conditionBankLabel" class="hidden">Банк</label>
+            <select id="conditionBank" class="hidden">
+              <option value="mono">Monobank (курс — автоматично)</option>
+              <option value="privat">ПриватБанк (курс — автоматично)</option>
+              <option value="pumb">ПУМБ (курс — вручну)</option>
+              <option value="sens">Sense Bank (курс — вручну)</option>
+            </select>
+            <label for="conditionManualRate" id="conditionManualRateLabel" class="hidden">Курс, ₴ за $1</label>
+            <input id="conditionManualRate" type="number" step="0.0001" min="0" class="hidden" placeholder="напр. 41.5" />
+          </div>
+          <div id="conditionsReadonly" class="conditions-summary hidden"></div>
+        </div>
+
         <div class="row" style="margin-top: 16px;">
           <button id="upload" class="primary" type="button">Залити на сайт</button>
         </div>
@@ -76,6 +90,121 @@
   const campaignBrandEl = document.getElementById('campaignBrand');
   const campaignPicker = document.getElementById('campaignPicker');
   const campaignHint = document.getElementById('campaignHint');
+  const conditionsSection = document.getElementById('conditionsSection');
+  const conditionsEditor = document.getElementById('conditionsEditor');
+  const conditionsReadonly = document.getElementById('conditionsReadonly');
+  const conditionCommission = document.getElementById('conditionCommission');
+  const conditionDiscount = document.getElementById('conditionDiscount');
+  const conditionCurrency = document.getElementById('conditionCurrency');
+  const conditionBank = document.getElementById('conditionBank');
+  const conditionBankLabel = document.getElementById('conditionBankLabel');
+  const conditionManualRate = document.getElementById('conditionManualRate');
+  const conditionManualRateLabel = document.getElementById('conditionManualRateLabel');
+
+  const BANK_NAMES = { mono: 'Monobank', privat: 'ПриватБанк', pumb: 'ПУМБ', sens: 'Sense Bank' };
+  const MANUAL_RATE_BANKS = new Set(['pumb', 'sens']);
+
+  function updateConditionsVisibility() {
+    const isUah = conditionCurrency.value === 'uah';
+    conditionBank.classList.toggle('hidden', !isUah);
+    conditionBankLabel.classList.toggle('hidden', !isUah);
+    const needsManualRate = isUah && MANUAL_RATE_BANKS.has(conditionBank.value);
+    conditionManualRate.classList.toggle('hidden', !needsManualRate);
+    conditionManualRateLabel.classList.toggle('hidden', !needsManualRate);
+  }
+  conditionCurrency.addEventListener('change', updateConditionsVisibility);
+  conditionBank.addEventListener('change', updateConditionsVisibility);
+  updateConditionsVisibility();
+
+  // Conditions are fixed at campaign creation — editable only while creating a new campaign;
+  // picking an existing one just shows what was set for it (new products uploaded into it must
+  // use the same conditions, so the whole campaign's pricing stays consistent).
+  function renderConditionsForSelection() {
+    if (selectedCampaignId === null) {
+      conditionsEditor.classList.remove('hidden');
+      conditionsReadonly.classList.add('hidden');
+      return;
+    }
+    const campaign = campaigns.find((c) => c.id === selectedCampaignId);
+    conditionsEditor.classList.add('hidden');
+    conditionsReadonly.classList.remove('hidden');
+    if (!campaign) {
+      conditionsReadonly.textContent = '';
+      return;
+    }
+    const parts = [
+      `комісія баєра ${campaign.buyerCommissionPercent}%`,
+      `додаткова знижка ${campaign.additionalDiscountPercent}%`,
+      campaign.displayCurrency === 'uah'
+        ? `ціни в грн (${BANK_NAMES[campaign.uahBank] || campaign.uahBank}, курс ${campaign.uahRate})`
+        : 'ціни в оригінальній валюті (USD)',
+    ];
+    conditionsReadonly.textContent = parts.join(' · ');
+  }
+
+  function readConditionsFromEditor() {
+    const buyerCommissionPercent = Number(conditionCommission.value);
+    const additionalDiscountPercent = Number(conditionDiscount.value);
+    if (!Number.isFinite(buyerCommissionPercent) || buyerCommissionPercent < 0) {
+      throw new Error('Комісія баєра має бути невідʼємним числом.');
+    }
+    if (!Number.isFinite(additionalDiscountPercent) || additionalDiscountPercent < 0) {
+      throw new Error('Додаткова знижка має бути невідʼємним числом.');
+    }
+    const displayCurrency = conditionCurrency.value;
+    const result = { buyerCommissionPercent, additionalDiscountPercent, displayCurrency };
+    if (displayCurrency === 'uah') {
+      result.uahBank = conditionBank.value;
+      if (MANUAL_RATE_BANKS.has(conditionBank.value)) {
+        const manualRate = Number(conditionManualRate.value);
+        if (!Number.isFinite(manualRate) || manualRate <= 0) {
+          throw new Error(`Для ${BANK_NAMES[conditionBank.value]} потрібно вказати курс вручну (додатне число).`);
+        }
+        result.uahRate = manualRate;
+      }
+    }
+    return result;
+  }
+
+  // final = price × (1 − знижка% ⁄ 100) × (1 + комісія% ⁄ 100), потім × курс, якщо ціни в грн.
+  function applySaleConditions(price, cond) {
+    if (typeof price !== 'number') return price;
+    let p = price * (1 - cond.additionalDiscountPercent / 100);
+    p = p * (1 + cond.buyerCommissionPercent / 100);
+    if (cond.displayCurrency === 'uah' && cond.uahRate) p = p * cond.uahRate;
+    return Math.round(p * 100) / 100;
+  }
+
+  // Always derives price/originalPrice from basePrice/baseOriginalPrice (the raw, pre-markup
+  // scraped price), never from a possibly-already-marked-up price/originalPrice — otherwise
+  // reloading current (already priced) products via "Завантажити поточні товари" and
+  // re-uploading them would stack the markup on top of itself. Products uploaded before this
+  // feature existed have no basePrice field; for those, price/originalPrice IS the base (no
+  // markup was ever applied), so falling back to it is correct, not just a safe default.
+  function applySaleConditionsToProducts(products, cond) {
+    return products.map((p) => {
+      const basePrice = typeof p.basePrice === 'number' ? p.basePrice : p.price;
+      const baseOriginalPrice = typeof p.baseOriginalPrice === 'number' ? p.baseOriginalPrice : p.originalPrice;
+      return {
+        ...p,
+        basePrice,
+        baseOriginalPrice,
+        price: applySaleConditions(basePrice, cond),
+        originalPrice: applySaleConditions(baseOriginalPrice, cond),
+        colors: (p.colors || []).map((c) => {
+          const cBasePrice = typeof c.basePrice === 'number' ? c.basePrice : c.price;
+          const cBaseOriginalPrice = typeof c.baseOriginalPrice === 'number' ? c.baseOriginalPrice : c.originalPrice;
+          return {
+            ...c,
+            ...(cBasePrice !== undefined ? { basePrice: cBasePrice, price: applySaleConditions(cBasePrice, cond) } : {}),
+            ...(cBaseOriginalPrice !== undefined
+              ? { baseOriginalPrice: cBaseOriginalPrice, originalPrice: applySaleConditions(cBaseOriginalPrice, cond) }
+              : {}),
+          };
+        }),
+      };
+    });
+  }
 
   function parseProductsPayload(text) {
     const trimmed = text.trim();
@@ -146,15 +275,20 @@
         sizes: Array.isArray(c.sizes)
           ? [...new Set(c.sizes.filter((s) => s && s.available !== false).map(displaySize))]
           : [],
-        ...(colorPrice !== undefined ? { price: colorPrice } : {}),
-        ...(colorOriginalPrice !== undefined ? { originalPrice: colorOriginalPrice } : {}),
+        // basePrice/baseOriginalPrice = raw scraped price, before any sale-conditions markup
+        // (buyer commission, discount, currency conversion — see applySaleConditionsToProducts).
+        // Keeping these separate from price/originalPrice is what makes reloading already-priced
+        // products via "Завантажити поточні товари" and re-uploading idempotent instead of
+        // stacking the markup on top of itself.
+        ...(colorPrice !== undefined ? { basePrice: colorPrice } : {}),
+        ...(colorOriginalPrice !== undefined ? { baseOriginalPrice: colorOriginalPrice } : {}),
       };
     });
 
     // Ціна товару на картці — найдешевший варіант кольору (якщо ціни різняться між кольорами).
-    const colorsWithPrice = colors.filter((c) => typeof c.price === 'number');
+    const colorsWithPrice = colors.filter((c) => typeof c.basePrice === 'number');
     const cheapestColor = colorsWithPrice.length
-      ? colorsWithPrice.reduce((min, c) => (c.price < min.price ? c : min))
+      ? colorsWithPrice.reduce((min, c) => (c.basePrice < min.basePrice ? c : min))
       : null;
     const allSizes = [...new Set(colors.flatMap((c) => c.sizes))];
     const saleId = raw.source || raw.saleId || '';
@@ -164,8 +298,8 @@
       id,
       name: raw.title || raw.name || id,
       description: raw.description || raw.title || '',
-      price: (cheapestColor && cheapestColor.price) ?? raw.price ?? 0,
-      originalPrice: (cheapestColor && cheapestColor.originalPrice) ?? raw.originalPrice,
+      basePrice: (cheapestColor && cheapestColor.basePrice) ?? raw.price ?? 0,
+      baseOriginalPrice: (cheapestColor && cheapestColor.baseOriginalPrice) ?? raw.originalPrice,
       categoryId: raw.category || raw.categoryId || 'other',
       saleId,
       sourceName: raw.sourceName || (brand && brand.name) || saleId,
@@ -255,8 +389,10 @@
     campaignPicker.querySelectorAll('input[name="campaignChoice"]').forEach((input) => {
       input.addEventListener('change', (e) => {
         selectedCampaignId = e.target.value === 'new' ? null : Number(e.target.value);
+        renderConditionsForSelection();
       });
     });
+    renderConditionsForSelection();
   }
 
   function escapeHtml(s) {
@@ -271,6 +407,7 @@
       parsed = parseProductsPayload(jsonArea.value).map(normalizeProduct);
     } catch {
       campaignSection.classList.add('hidden');
+      conditionsSection.classList.add('hidden');
       campaignHint.textContent = '';
       detectedBrand = null;
       return;
@@ -279,6 +416,7 @@
     const brands = [...new Set(parsed.map((p) => p.saleId).filter(Boolean))];
     if (brands.length !== 1) {
       campaignSection.classList.add('hidden');
+      conditionsSection.classList.add('hidden');
       campaignHint.textContent =
         brands.length === 0
           ? 'Не вдалося визначити бренд товарів.'
@@ -309,6 +447,7 @@
       selectedCampaignId = null;
     }
     campaignSection.classList.remove('hidden');
+    conditionsSection.classList.remove('hidden');
     renderCampaignPicker();
   }
 
@@ -345,6 +484,29 @@
       return;
     }
 
+    let conditions;
+    if (selectedCampaignId === null) {
+      try {
+        conditions = readConditionsFromEditor();
+      } catch (err) {
+        AdminShared.setStatus(statusEl, 'err', err.message);
+        return;
+      }
+    } else {
+      const campaign = campaigns.find((c) => c.id === selectedCampaignId);
+      if (!campaign) {
+        AdminShared.setStatus(statusEl, 'err', 'Обрана кампанія більше не існує — онови сторінку.');
+        return;
+      }
+      conditions = {
+        buyerCommissionPercent: campaign.buyerCommissionPercent,
+        additionalDiscountPercent: campaign.additionalDiscountPercent,
+        displayCurrency: campaign.displayCurrency,
+        uahBank: campaign.uahBank,
+        uahRate: campaign.uahRate,
+      };
+    }
+
     uploadBtn.disabled = true;
     try {
       let saleEventId = selectedCampaignId;
@@ -360,14 +522,25 @@
             saleId: detectedBrand,
             name: nameInput.value.trim() || undefined,
             endDate: endDateInput.value || null,
+            ...conditions,
           }),
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
         saleEventId = body.id;
+        // The server resolves the actual bank rate (auto-fetched for mono/privat) — use that,
+        // not whatever was in the manual-rate field, so uploaded prices match what got saved.
+        conditions = {
+          buyerCommissionPercent: body.buyerCommissionPercent,
+          additionalDiscountPercent: body.additionalDiscountPercent,
+          displayCurrency: body.displayCurrency,
+          uahBank: body.uahBank,
+          uahRate: body.uahRate,
+        };
       }
 
-      const batches = chunkProductsForUpload(parsed);
+      const priced = applySaleConditionsToProducts(parsed, conditions);
+      const batches = chunkProductsForUpload(priced);
       for (let i = 0; i < batches.length; i++) {
         const batchLabel = batches.length > 1 ? ` (${i + 1}/${batches.length})` : '';
         AdminShared.setStatus(statusEl, 'pending', `Заливаю...${batchLabel}`);

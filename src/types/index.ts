@@ -24,6 +24,9 @@ export interface ProductColor {
   sizes: string[];
   price?: number;
   originalPrice?: number;
+  /** Raw scraped price before the sale campaign's reseller markup — see admin-upload.html. */
+  basePrice?: number;
+  baseOriginalPrice?: number;
 }
 
 export interface Product {
@@ -32,6 +35,9 @@ export interface Product {
   description: string;
   price: number;
   originalPrice?: number;
+  /** Raw scraped price before the sale campaign's reseller markup — see admin-upload.html. */
+  basePrice?: number;
+  baseOriginalPrice?: number;
   categoryId: CategoryId;
   saleId: SaleId;
   sourceName: string;

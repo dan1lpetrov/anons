@@ -206,6 +206,21 @@ code {
 
 .weights-grid input[type="number"] { width: 90px; }
 
+.campaign-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+.campaign-option:last-child { border-bottom: none; }
+
+.conditions-grid { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; align-items: center; margin-top: 8px; }
+.conditions-grid label { font-size: 14px; }
+.conditions-grid input[type="number"] { width: 110px; }
+.conditions-summary { font-size: 14px; line-height: 1.6; }
+
 /* --- Admin shell: sidebar + content --- */
 .admin-shell { display: flex; min-height: 100vh; align-items: stretch; }
 

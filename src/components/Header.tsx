@@ -40,15 +40,32 @@ export function Header({
   // honors a keyboard-dismissing blur() when it's triggered from a direct,
   // trusted touch event, and 'scroll' fires later/async (often during momentum),
   // which iOS doesn't count as one. 'touchmove' fires the instant the drag starts.
-  useEffect(() => {
-    const handleTouchMove = () => {
-      if (document.activeElement === searchInputRef.current) {
-        dismissKeyboard();
-      }
-    };
-    window.addEventListener('touchmove', handleTouchMove, { passive: true });
-    return () => window.removeEventListener('touchmove', handleTouchMove);
-  }, []);
+  // The listener is attached only while the field is actually focused (added on
+  // focus, removed on blur) — left mounted permanently, a window-level touchmove
+  // listener interferes with Telegram's own native swipe recognizer on the
+  // horizontal carousels and makes ordinary carousel swipes close the app again.
+  const touchDismissHandlerRef = useRef<(() => void) | null>(null);
+
+  const handleSearchFocus = () => {
+    onSearchFocus?.();
+    const handler = () => dismissKeyboard();
+    touchDismissHandlerRef.current = handler;
+    window.addEventListener('touchmove', handler, { passive: true });
+  };
+
+  const handleSearchBlur = () => {
+    if (touchDismissHandlerRef.current) {
+      window.removeEventListener('touchmove', touchDismissHandlerRef.current);
+      touchDismissHandlerRef.current = null;
+    }
+  };
+
+  useEffect(
+    () => () => {
+      if (touchDismissHandlerRef.current) window.removeEventListener('touchmove', touchDismissHandlerRef.current);
+    },
+    [],
+  );
 
   return (
     <header className="app-header-wrap">
@@ -63,7 +80,8 @@ export function Header({
               ref={searchInputRef}
               value={searchValue}
               onChange={(event) => onSearchChange(event.target.value)}
-              onFocus={onSearchFocus}
+              onFocus={handleSearchFocus}
+              onBlur={handleSearchBlur}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') dismissKeyboard();
               }}

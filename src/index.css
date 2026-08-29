@@ -109,17 +109,28 @@ img {
   background: var(--tg-bg);
 }
 
-.app-header {
+.app-header-wrap {
   position: sticky;
   top: 0;
   z-index: 10;
+  background: var(--tg-bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.app-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 12px max(16px, calc((100% - var(--content-max)) / 2));
-  background: var(--tg-bg);
-  border-bottom: 1px solid var(--border);
+}
+
+.app-header__search-row {
+  padding: 0 max(16px, calc((100% - var(--content-max)) / 2)) 12px;
+}
+
+.app-header__search-row .catalog-search {
+  margin: 0;
 }
 
 .app-header__brand {
@@ -151,63 +162,6 @@ img {
   font-weight: 600;
 }
 
-.header-search-button {
-  margin-left: auto;
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-sm);
-  background: var(--tg-secondary-bg);
-  color: var(--text-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.header-search-overlay {
-  position: absolute;
-  z-index: 2;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px max(12px, calc((100% - var(--content-max)) / 2));
-  background: var(--tg-bg);
-}
-
-.header-search-overlay__back {
-  width: 36px;
-  height: 36px;
-  color: var(--text-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.header-search-overlay label {
-  min-width: 0;
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  height: 40px;
-  padding: 0 11px;
-  border-radius: var(--radius-sm);
-  background: var(--tg-secondary-bg);
-  color: var(--tg-hint);
-}
-
-.header-search-overlay input {
-  min-width: 0;
-  flex: 1;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--tg-text);
-  font-size: 15px;
-}
-
-.header-search-overlay__clear { width: 28px; height: 28px; border-radius: 50%; background: var(--tg-secondary-bg); color: var(--tg-hint); display: flex; align-items: center; justify-content: center; }
-
 .cart-button {
   position: relative;
   width: 44px;
@@ -215,9 +169,7 @@ img {
   border-radius: var(--radius-sm);
   background: var(--tg-secondary-bg);
   font-size: 20px;
-  /* Hidden on mobile — the bottom nav owns cart navigation there; shown again
-     at desktop widths (>=720px) once the bottom nav hides, per DESIGN.md. */
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
 }
@@ -1174,7 +1126,8 @@ img {
   position: relative;
   flex: 0 0 100%;
   scroll-snap-align: start;
-  aspect-ratio: 4 / 5;
+  aspect-ratio: 16 / 9;
+  max-height: 280px;
   text-align: left;
 }
 
@@ -1275,13 +1228,23 @@ img {
 }
 
 .home-category-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  display: flex;
   gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.home-category-grid::-webkit-scrollbar {
+  display: none;
 }
 
 .home-category-tile {
   position: relative;
+  flex: 0 0 68%;
+  scroll-snap-align: start;
   aspect-ratio: 4 / 3;
   border-radius: var(--radius);
   overflow: hidden;
@@ -1412,10 +1375,6 @@ img {
 @media (min-width: 720px) {
   :root {
     --content-max: 900px;
-  }
-
-  .cart-button {
-    display: flex;
   }
 
   .bottom-nav {

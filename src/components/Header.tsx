@@ -1,55 +1,59 @@
-import { useEffect, useRef, useState } from 'react';
-import { Search, ShoppingCart, ChevronLeft, X } from 'lucide-react';
+import { Search, ShoppingCart, X } from 'lucide-react';
 
 interface HeaderProps {
   title: string;
   cartCount: number;
   showCart: boolean;
+  showSearch: boolean;
   onCartClick: () => void;
   searchValue: string;
   onSearchChange: (value: string) => void;
+  onSearchFocus?: () => void;
   onHomeClick: () => void;
 }
 
-export function Header({ title, cartCount, showCart, onCartClick, searchValue, onSearchChange, onHomeClick }: HeaderProps) {
-  const [searchOpen, setSearchOpen] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (searchOpen) inputRef.current?.focus();
-  }, [searchOpen]);
-
+export function Header({
+  title,
+  cartCount,
+  showCart,
+  showSearch,
+  onCartClick,
+  searchValue,
+  onSearchChange,
+  onSearchFocus,
+  onHomeClick,
+}: HeaderProps) {
   return (
-    <header className="app-header">
-      <button type="button" className="app-header__brand" onClick={onHomeClick} aria-label="На головну">
-        <span className="app-header__logo">A</span>
-        <h1>{title}</h1>
-      </button>
-      {showCart && (
-        <button type="button" className="header-search-button" onClick={() => setSearchOpen(true)} aria-label="Пошук">
-          <Search size={20} strokeWidth={2} />
+    <header className="app-header-wrap">
+      <div className="app-header">
+        <button type="button" className="app-header__brand" onClick={onHomeClick} aria-label="На головну">
+          <span className="app-header__logo">A</span>
+          <h1>{title}</h1>
         </button>
-      )}
-      {showCart && (
-        <button type="button" className="cart-button" onClick={onCartClick} aria-label="Кошик">
-          <ShoppingCart size={20} strokeWidth={2} />
-          {cartCount > 0 && <span className="cart-button__badge">{cartCount}</span>}
-        </button>
-      )}
-      {searchOpen && (
-        <div className="header-search-overlay">
-          <button type="button" className="header-search-overlay__back" onClick={() => setSearchOpen(false)} aria-label="Закрити пошук">
-            <ChevronLeft size={24} strokeWidth={2} />
+        {showCart && (
+          <button type="button" className="cart-button" onClick={onCartClick} aria-label="Кошик">
+            <ShoppingCart size={20} strokeWidth={2} />
+            {cartCount > 0 && <span className="cart-button__badge">{cartCount}</span>}
           </button>
-          <label>
+        )}
+      </div>
+      {showSearch && (
+        <div className="app-header__search-row">
+          <label className="catalog-search">
             <Search size={18} strokeWidth={2} aria-hidden="true" />
-            <input ref={inputRef} value={searchValue} onChange={(event) => onSearchChange(event.target.value)} type="search" placeholder="Пошук товарів..." />
+            <input
+              value={searchValue}
+              onChange={(event) => onSearchChange(event.target.value)}
+              onFocus={onSearchFocus}
+              type="search"
+              placeholder="Пошук товарів..."
+            />
+            {searchValue && (
+              <button type="button" aria-label="Очистити пошук" onClick={() => onSearchChange('')}>
+                <X size={16} strokeWidth={2} />
+              </button>
+            )}
           </label>
-          {searchValue && (
-            <button type="button" className="header-search-overlay__clear" onClick={() => onSearchChange('')} aria-label="Очистити пошук">
-              <X size={16} strokeWidth={2} />
-            </button>
-          )}
         </div>
       )}
     </header>

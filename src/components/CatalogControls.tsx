@@ -1,25 +1,8 @@
-import { useState, type ChangeEvent, type ReactNode } from 'react';
-import { Search, SlidersHorizontal, X } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
+import { SlidersHorizontal, X } from 'lucide-react';
 import type { CatalogFilters, Sale, SortOption } from '../types';
 import type { AvailableSizes } from '../utils/catalog';
 import { SizeChips } from './SizeChips';
-
-interface SearchProps {
-  value: string;
-  onChange: (value: string) => void;
-}
-
-export function CatalogSearch({ value, onChange }: SearchProps) {
-  const updateSearch = (event: ChangeEvent<HTMLInputElement>) => onChange(event.target.value);
-
-  return (
-    <label className="catalog-search">
-      <Search size={18} strokeWidth={2} aria-hidden="true" />
-      <input value={value} onChange={updateSearch} type="search" placeholder="Пошук товарів..." />
-      {value && <button type="button" aria-label="Очистити пошук" onClick={() => onChange('')}><X size={16} strokeWidth={2} /></button>}
-    </label>
-  );
-}
 
 interface CatalogControlsProps {
   filters: CatalogFilters;

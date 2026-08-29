@@ -265,9 +265,13 @@ export default function App() {
         title={SCREEN_TITLES[screen]}
         cartCount={cart.totalItems}
         showCart={screen === 'home' || screen === 'catalog' || screen === 'product'}
+        showSearch={screen === 'home' || screen === 'catalog'}
         onCartClick={() => navigate('cart')}
         searchValue={filters.search}
         onSearchChange={(search) => setFilters({ ...filters, search })}
+        onSearchFocus={() => {
+          if (screen === 'home') navigate('catalog');
+        }}
         onHomeClick={() => navigate('home')}
       />
 

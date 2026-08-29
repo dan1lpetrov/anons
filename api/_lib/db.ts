@@ -2,114 +2,136 @@ import { db } from '@vercel/postgres';
 
 let schemaReady: Promise<void> | null = null;
 
+// Arbitrary constant used only as a lock key — see the advisory-lock note below.
+const SCHEMA_LOCK_KEY = 84237551;
+
 export async function ensureSchema(): Promise<void> {
   if (!schemaReady) {
-    schemaReady = (async () => {
-      const client = await db.connect();
-      try {
-        await client.query(`
-          CREATE TABLE IF NOT EXISTS products (
-            id TEXT PRIMARY KEY,
-            category_id TEXT NOT NULL,
-            sale_id TEXT NOT NULL,
-            featured_rank INTEGER NOT NULL DEFAULT 0,
-            data JSONB NOT NULL,
-            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-          );
-        `);
-        await client.query(`
-          CREATE TABLE IF NOT EXISTS sale_windows (
-            sale_id TEXT PRIMARY KEY,
-            end_date TIMESTAMPTZ,
-            active BOOLEAN NOT NULL DEFAULT true,
-            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-          );
-        `);
-        await client.query(`
-          CREATE TABLE IF NOT EXISTS price_history (
-            id SERIAL PRIMARY KEY,
-            product_id TEXT NOT NULL,
-            color_id TEXT NOT NULL,
-            price NUMERIC NOT NULL,
-            recorded_at TIMESTAMPTZ NOT NULL DEFAULT now()
-          );
-        `);
-        await client.query(`
-          CREATE INDEX IF NOT EXISTS price_history_lookup ON price_history (product_id, color_id, recorded_at);
-        `);
-        await client.query(`
-          CREATE TABLE IF NOT EXISTS product_events (
-            id SERIAL PRIMARY KEY,
-            telegram_user_id TEXT,
-            product_id TEXT NOT NULL,
-            event_type TEXT NOT NULL CHECK (event_type IN ('view', 'order')),
-            created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-          );
-        `);
-        await client.query(`
-          CREATE INDEX IF NOT EXISTS product_events_product_lookup ON product_events (product_id, event_type, created_at);
-        `);
-        await client.query(`
-          CREATE INDEX IF NOT EXISTS product_events_user_lookup ON product_events (telegram_user_id, created_at);
-        `);
-        await client.query(`ALTER TABLE product_events ADD COLUMN IF NOT EXISTS order_id TEXT;`);
-        await client.query(`ALTER TABLE product_events ADD COLUMN IF NOT EXISTS quantity INTEGER;`);
-        await client.query(`ALTER TABLE product_events ADD COLUMN IF NOT EXISTS unit_price NUMERIC;`);
-        await client.query(`
-          CREATE INDEX IF NOT EXISTS product_events_order_lookup ON product_events (order_id);
-        `);
-        await client.query(`
-          CREATE INDEX IF NOT EXISTS product_events_created_at ON product_events (created_at);
-        `);
-        await client.query(`
-          CREATE TABLE IF NOT EXISTS product_scores (
-            product_id TEXT PRIMARY KEY,
-            score NUMERIC NOT NULL,
-            computed_at TIMESTAMPTZ NOT NULL DEFAULT now()
-          );
-        `);
-        await client.query(`
-          CREATE TABLE IF NOT EXISTS product_similar (
-            product_id TEXT NOT NULL,
-            similar_product_id TEXT NOT NULL,
-            weight NUMERIC NOT NULL,
-            PRIMARY KEY (product_id, similar_product_id)
-          );
-        `);
-        await client.query(`
-          CREATE TABLE IF NOT EXISTS banners (
-            id SERIAL PRIMARY KEY,
-            image_url TEXT NOT NULL,
-            title TEXT NOT NULL DEFAULT '',
-            subtitle TEXT NOT NULL DEFAULT '',
-            link_category_id TEXT,
-            link_sale_id TEXT,
-            link_url TEXT,
-            sort_order INTEGER NOT NULL DEFAULT 0,
-            active BOOLEAN NOT NULL DEFAULT true,
-            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-          );
-        `);
-        await client.query(`ALTER TABLE banners ADD COLUMN IF NOT EXISTS link_sale_id TEXT;`);
-        await client.query(`ALTER TABLE banners ADD COLUMN IF NOT EXISTS link_url TEXT;`);
-        await client.query(`
-          CREATE TABLE IF NOT EXISTS score_weights (
-            id INTEGER PRIMARY KEY DEFAULT 1,
-            discount NUMERIC NOT NULL DEFAULT 0.25,
-            price_vs_history NUMERIC NOT NULL DEFAULT 0.25,
-            views NUMERIC NOT NULL DEFAULT 0.15,
-            orders NUMERIC NOT NULL DEFAULT 0.25,
-            trending NUMERIC NOT NULL DEFAULT 0.1,
-            updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-            CHECK (id = 1)
-          );
-        `);
-      } finally {
-        client.release();
-      }
-    })();
+    schemaReady = runEnsureSchema().catch((err) => {
+      // Don't cache a rejected promise forever: a transient failure (e.g. a lock-wait
+      // timeout) would otherwise 500 every request on this warm container until it cold-starts
+      // again. Reset so the next call gets a fresh attempt instead.
+      schemaReady = null;
+      throw err;
+    });
   }
   return schemaReady;
+}
+
+async function runEnsureSchema(): Promise<void> {
+  const client = await db.connect();
+  try {
+    // Every cold serverless instance calls this on its first request, so right after a deploy
+    // many of them race to run the DDL below concurrently. `CREATE TABLE/INDEX IF NOT EXISTS`
+    // is NOT atomic across concurrent transactions — two can both see "doesn't exist yet" and
+    // both try to create it, which throws a duplicate-key error on Postgres's own pg_class
+    // catalog rather than silently no-op'ing. A session advisory lock serializes those racing
+    // attempts: whoever loses the race just finds everything already created and does nothing.
+    await client.query('SELECT pg_advisory_lock($1)', [SCHEMA_LOCK_KEY]);
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS products (
+          id TEXT PRIMARY KEY,
+          category_id TEXT NOT NULL,
+          sale_id TEXT NOT NULL,
+          featured_rank INTEGER NOT NULL DEFAULT 0,
+          data JSONB NOT NULL,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+      `);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS sale_windows (
+          sale_id TEXT PRIMARY KEY,
+          end_date TIMESTAMPTZ,
+          active BOOLEAN NOT NULL DEFAULT true,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+      `);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS price_history (
+          id SERIAL PRIMARY KEY,
+          product_id TEXT NOT NULL,
+          color_id TEXT NOT NULL,
+          price NUMERIC NOT NULL,
+          recorded_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+      `);
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS price_history_lookup ON price_history (product_id, color_id, recorded_at);
+      `);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS product_events (
+          id SERIAL PRIMARY KEY,
+          telegram_user_id TEXT,
+          product_id TEXT NOT NULL,
+          event_type TEXT NOT NULL CHECK (event_type IN ('view', 'order')),
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+      `);
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS product_events_product_lookup ON product_events (product_id, event_type, created_at);
+      `);
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS product_events_user_lookup ON product_events (telegram_user_id, created_at);
+      `);
+      await client.query(`ALTER TABLE product_events ADD COLUMN IF NOT EXISTS order_id TEXT;`);
+      await client.query(`ALTER TABLE product_events ADD COLUMN IF NOT EXISTS quantity INTEGER;`);
+      await client.query(`ALTER TABLE product_events ADD COLUMN IF NOT EXISTS unit_price NUMERIC;`);
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS product_events_order_lookup ON product_events (order_id);
+      `);
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS product_events_created_at ON product_events (created_at);
+      `);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS product_scores (
+          product_id TEXT PRIMARY KEY,
+          score NUMERIC NOT NULL,
+          computed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+      `);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS product_similar (
+          product_id TEXT NOT NULL,
+          similar_product_id TEXT NOT NULL,
+          weight NUMERIC NOT NULL,
+          PRIMARY KEY (product_id, similar_product_id)
+        );
+      `);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS banners (
+          id SERIAL PRIMARY KEY,
+          image_url TEXT NOT NULL,
+          title TEXT NOT NULL DEFAULT '',
+          subtitle TEXT NOT NULL DEFAULT '',
+          link_category_id TEXT,
+          link_sale_id TEXT,
+          link_url TEXT,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          active BOOLEAN NOT NULL DEFAULT true,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+      `);
+      await client.query(`ALTER TABLE banners ADD COLUMN IF NOT EXISTS link_sale_id TEXT;`);
+      await client.query(`ALTER TABLE banners ADD COLUMN IF NOT EXISTS link_url TEXT;`);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS score_weights (
+          id INTEGER PRIMARY KEY DEFAULT 1,
+          discount NUMERIC NOT NULL DEFAULT 0.25,
+          price_vs_history NUMERIC NOT NULL DEFAULT 0.25,
+          views NUMERIC NOT NULL DEFAULT 0.15,
+          orders NUMERIC NOT NULL DEFAULT 0.25,
+          trending NUMERIC NOT NULL DEFAULT 0.1,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          CHECK (id = 1)
+        );
+      `);
+    } finally {
+      await client.query('SELECT pg_advisory_unlock($1)', [SCHEMA_LOCK_KEY]);
+    }
+  } finally {
+    client.release();
+  }
 }
 
 export { db };

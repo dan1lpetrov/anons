@@ -87,22 +87,18 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
 
   const yFor = (price: number) => PAD_TOP + plotHeight - ((price - scaleMin) / scaleSpan) * plotHeight;
 
-  // Real history has a recordedAt for every point; the synthesized
-  // original->sale cold-start pair has `null` for its first point, so we
-  // fall back to even spacing there since there's no real duration to plot.
-  const hasAllDates = points.every((p) => p.recordedAt !== null);
-  const times = hasAllDates ? points.map((p) => new Date(p.recordedAt as string).getTime()) : [];
-  const t0 = times[0];
-  const tSpan = times.length ? times[times.length - 1] - t0 || 1 : 1;
-
-  // `x` is the true step-transition position (when the price actually changed);
-  // the step path and hover band lookup are built from this.
+  // `x` positions are spaced evenly by index, not by real elapsed time.
+  // Real-time spacing made a silent month collapse into one long flat line
+  // and then cram same-day price changes into a tight cluster that read as
+  // an hourly chart — even spacing shows the sequence of changes without
+  // exaggerating (or hiding) the real gaps between them. Dates in the
+  // tooltip/axis labels still come from the real `recordedAt`.
   const coords = points.map((p, i) => {
     let x: number;
     if (isPair) {
       x = i === 0 ? PAD_X : PAD_X + TWO_POINT_GAP;
     } else {
-      const xFrac = hasAllDates ? (times[i] - t0) / tSpan : i / (points.length - 1);
+      const xFrac = i / (points.length - 1);
       x = PAD_X + xFrac * plotWidth;
     }
     return { ...p, x, y: yFor(p.price) };

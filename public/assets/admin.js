@@ -2,6 +2,7 @@ window.AdminShared = (function () {
   const PAGES = [
     { key: 'sales', href: '/admin', label: 'Розпродажі', icon: 'tag' },
     { key: 'upload', href: '/admin/upload', label: 'Додати розпродаж', icon: 'upload' },
+    { key: 'banners', href: '/admin/banners', label: 'Банери', icon: 'image' },
     { key: 'weights', href: '/admin/weights', label: 'Ваги ранжування', icon: 'sliders' },
   ];
 
@@ -13,6 +14,7 @@ window.AdminShared = (function () {
     moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
     monitor: '<rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/>',
     logOut: '<path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>',
+    image: '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
     inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
   };
 

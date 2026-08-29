@@ -48,9 +48,13 @@ A "sale" (`sale_windows` table) is a per-`saleId` row with `end_date`/`active`. 
 
 ### Client app structure
 
-`src/App.tsx` is a single-page state machine over a `Screen` union (`home|catalog|product|cart|success`), not a router — navigation is manual `window.history.pushState`/`popstate` handling. Telegram WebApp integration lives in `src/hooks/useTelegram.ts` (haptics, MainButton/BackButton, `initDataUnsafe.user`). Note: the Telegram-native MainButton's "add to cart" handler in `App.tsx` always adds `product.colors[0]`/`sizes[0]` regardless of what's selected in `ProductDetail`'s own state — it doesn't share state with the in-page size/color pickers.
+`src/App.tsx` is a single-page state machine over a `Screen` union (`home|catalog|product|cart|success`), not a router — navigation is manual `window.history.pushState`/`popstate` handling. `'home'` (curated landing: banners, top-N products, category tiles) is the initial/root screen; `'catalog'` (full filtered/sorted grid) is a separate screen reached via "Дивитись всі" or a category tile, not the default anymore. Telegram WebApp integration lives in `src/hooks/useTelegram.ts` (haptics, MainButton/BackButton, `initDataUnsafe.user`, theme sync — see the dark-mode gotcha in the design memory). Note: the Telegram-native MainButton's "add to cart" handler in `App.tsx` always adds `product.colors[0]`/`sizes[0]` regardless of what's selected in `ProductDetail`'s own state — it doesn't share state with the in-page size/color pickers.
 
 Cart state (`src/hooks/useCart.ts`) persists to `localStorage` under `anons-cart`, keyed by `productId:size:colorId`. It resolves per-line pricing by looking up the cart item's color on the current `Product` object, so a cart line's price always reflects the color actually chosen — see the pricing note above for why this matters.
+
+### Home screen banners
+
+`banners` table (`api/_lib/db.ts`) is a small admin-managed CMS — the only hand-curated content in an otherwise fully-scraped catalog. `api/banners.ts`: `GET` is public and returns only `active` rows ordered by `sort_order` (for the storefront carousel); `GET ?all=1` is admin-gated and returns every row (for `/admin/banners`'s management list). `POST`/`DELETE` are admin-gated. Each banner has an optional `linkCategoryId` — tapping it in `BannerCarousel` navigates to Catalog pre-filtered to that category (same `categoryId` values products already carry), or to the unfiltered Catalog if unset. No image upload/hosting — admin pastes an image URL, same as product images.
 
 ## Product ranking score (global sort done; personalization not yet)
 

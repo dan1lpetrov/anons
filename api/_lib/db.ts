@@ -68,6 +68,18 @@ export async function ensureSchema(): Promise<void> {
           );
         `);
         await client.query(`
+          CREATE TABLE IF NOT EXISTS banners (
+            id SERIAL PRIMARY KEY,
+            image_url TEXT NOT NULL,
+            title TEXT NOT NULL DEFAULT '',
+            subtitle TEXT NOT NULL DEFAULT '',
+            link_category_id TEXT,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            active BOOLEAN NOT NULL DEFAULT true,
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+          );
+        `);
+        await client.query(`
           CREATE TABLE IF NOT EXISTS score_weights (
             id INTEGER PRIMARY KEY DEFAULT 1,
             discount NUMERIC NOT NULL DEFAULT 0.25,

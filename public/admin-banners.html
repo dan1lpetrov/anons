@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Anons — Банери</title>
+<script>(function(){try{var t=localStorage.getItem('anons-admin-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/assets/admin.css" />
+<style>
+  .banner-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+  .banner-form-grid .full { grid-column: 1 / -1; }
+  .banner-form-grid label { display: block; margin-bottom: 4px; }
+  .banner-form-grid input[type="text"],
+  .banner-form-grid input[type="number"] { width: 100%; }
+  .banner-row { display: grid; grid-template-columns: 72px 1fr auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .banner-row:last-child { border-bottom: none; }
+  .banner-row__thumb { width: 72px; height: 72px; border-radius: var(--radius-sm); object-fit: cover; background: var(--bg); }
+  .banner-row__body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .banner-row__title { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .banner-row__meta { font-size: 12px; color: var(--hint); }
+  .banner-row__actions { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+  .checkbox-field { display: flex; align-items: center; gap: 8px; }
+  .checkbox-field label { text-transform: none; font-size: 14px; font-weight: 400; color: var(--text); margin: 0; }
+</style>
+</head>
+<body>
+
+<div id="loginScreen" class="login-screen hidden">
+  <div class="login-screen__box">
+    <h1>Anons Admin</h1>
+    <p class="hint">Потрібен вхід через Google-акаунт адміністратора.</p>
+    <a class="button primary" href="/admin">Перейти до входу</a>
+  </div>
+</div>
+
+<div id="app" class="admin-shell hidden">
+  <div id="nav"></div>
+  <main class="admin-content">
+    <div class="admin-content__inner">
+      <div>
+        <h1>Банери на головній</h1>
+        <p class="hint">Керує каруселлю банерів на головному екрані сторефронту. Посилання на категорію — необов'язкове: id категорії такий самий, як categoryId у товарах (наприклад <code>shoes</code>, <code>clothing</code>).</p>
+      </div>
+
+      <section id="addSection">
+        <h2>Додати банер</h2>
+        <div class="banner-form-grid">
+          <div class="full">
+            <label for="newImageUrl">URL картинки</label>
+            <input id="newImageUrl" type="text" placeholder="https://..." />
+          </div>
+          <div>
+            <label for="newTitle">Заголовок</label>
+            <input id="newTitle" type="text" placeholder="SS24 COMING SOON" />
+          </div>
+          <div>
+            <label for="newSubtitle">Підзаголовок</label>
+            <input id="newSubtitle" type="text" placeholder="Дивитись" />
+          </div>
+          <div>
+            <label for="newCategory">Категорія (необов'язково)</label>
+            <input id="newCategory" type="text" placeholder="shoes" />
+          </div>
+          <div>
+            <label for="newOrder">Порядок</label>
+            <input id="newOrder" type="number" step="1" value="0" />
+          </div>
+        </div>
+        <div class="checkbox-field">
+          <input id="newActive" type="checkbox" checked />
+          <label for="newActive">Активний</label>
+        </div>
+        <div class="row">
+          <button id="addBanner" class="primary" type="button">Додати банер</button>
+        </div>
+        <div id="addStatus" class="status"></div>
+      </section>
+
+      <section>
+        <div class="row" style="justify-content: space-between;">
+          <h2>Усі банери</h2>
+          <button id="reloadBanners" class="secondary" type="button">Оновити</button>
+        </div>
+        <div id="bannersList"></div>
+        <div id="listStatus" class="status"></div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script src="/assets/admin.js"></script>
+<script>
+  const addImageUrl = document.getElementById('newImageUrl');
+  const addTitle = document.getElementById('newTitle');
+  const addSubtitle = document.getElementById('newSubtitle');
+  const addCategory = document.getElementById('newCategory');
+  const addOrder = document.getElementById('newOrder');
+  const addActive = document.getElementById('newActive');
+  const addStatus = document.getElementById('addStatus');
+  const addBtn = document.getElementById('addBanner');
+
+  const bannersList = document.getElementById('bannersList');
+  const listStatus = document.getElementById('listStatus');
+  const reloadBtn = document.getElementById('reloadBanners');
+
+  async function loadBanners() {
+    AdminShared.setStatus(listStatus, 'pending', 'Завантаження...');
+    try {
+      const res = await fetch('/api/banners?all=1', { cache: 'no-store', credentials: 'include' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      const banners = await res.json();
+      renderBanners(banners);
+      listStatus.className = 'status';
+    } catch (err) {
+      AdminShared.setStatus(listStatus, 'err', 'Помилка: ' + err.message);
+    }
+  }
+
+  function renderBanners(banners) {
+    bannersList.innerHTML = '';
+    if (banners.length === 0) {
+      bannersList.innerHTML = `<div class="empty-state">${AdminShared.icon('inbox', 32)}<p>Ще немає жодного банера.</p></div>`;
+      return;
+    }
+
+    banners.forEach((banner) => {
+      const row = document.createElement('div');
+      row.className = 'banner-row';
+
+      const thumb = document.createElement('img');
+      thumb.className = 'banner-row__thumb';
+      thumb.src = banner.imageUrl;
+      thumb.alt = '';
+
+      const body = document.createElement('div');
+      body.className = 'banner-row__body';
+      const title = document.createElement('div');
+      title.className = 'banner-row__title';
+      title.textContent = banner.title || '(без заголовка)';
+      const meta = document.createElement('div');
+      meta.className = 'banner-row__meta';
+      meta.textContent = `#${banner.sortOrder} · ${banner.active ? 'Активний' : 'Вимкнений'}${banner.linkCategoryId ? ' · → ' + banner.linkCategoryId : ''}`;
+      body.append(title, meta);
+
+      const actions = document.createElement('div');
+      actions.className = 'banner-row__actions';
+
+      const toggleBtn = document.createElement('button');
+      toggleBtn.type = 'button';
+      toggleBtn.className = 'secondary';
+      toggleBtn.textContent = banner.active ? 'Вимкнути' : 'Увімкнути';
+      toggleBtn.addEventListener('click', () => saveBanner({ ...banner, active: !banner.active }));
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'danger';
+      deleteBtn.textContent = 'Видалити';
+      deleteBtn.addEventListener('click', () => deleteBanner(banner.id));
+
+      actions.append(toggleBtn, deleteBtn);
+      row.append(thumb, body, actions);
+      bannersList.appendChild(row);
+    });
+  }
+
+  async function saveBanner(banner) {
+    AdminShared.setStatus(listStatus, 'pending', 'Збереження...');
+    try {
+      const res = await fetch('/api/banners', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(banner),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      AdminShared.setStatus(listStatus, 'ok', 'Збережено.');
+      loadBanners();
+    } catch (err) {
+      AdminShared.setStatus(listStatus, 'err', 'Помилка: ' + err.message);
+    }
+  }
+
+  async function deleteBanner(id) {
+    if (!confirm('Видалити цей банер?')) return;
+    AdminShared.setStatus(listStatus, 'pending', 'Видалення...');
+    try {
+      const res = await fetch(`/api/banners?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      AdminShared.setStatus(listStatus, 'ok', 'Видалено.');
+      loadBanners();
+    } catch (err) {
+      AdminShared.setStatus(listStatus, 'err', 'Помилка: ' + err.message);
+    }
+  }
+
+  addBtn.addEventListener('click', async () => {
+    if (!addImageUrl.value.trim()) {
+      AdminShared.setStatus(addStatus, 'err', 'URL картинки обовʼязковий.');
+      return;
+    }
+    addBtn.disabled = true;
+    try {
+      AdminShared.setStatus(addStatus, 'pending', 'Додавання...');
+      await saveBanner({
+        imageUrl: addImageUrl.value.trim(),
+        title: addTitle.value.trim(),
+        subtitle: addSubtitle.value.trim(),
+        linkCategoryId: addCategory.value.trim() || null,
+        sortOrder: Number(addOrder.value) || 0,
+        active: addActive.checked,
+      });
+      addImageUrl.value = '';
+      addTitle.value = '';
+      addSubtitle.value = '';
+      addCategory.value = '';
+      addOrder.value = '0';
+      addActive.checked = true;
+      AdminShared.setStatus(addStatus, 'ok', 'Додано.');
+    } catch (err) {
+      AdminShared.setStatus(addStatus, 'err', 'Помилка: ' + err.message);
+    } finally {
+      addBtn.disabled = false;
+    }
+  });
+
+  reloadBtn.addEventListener('click', loadBanners);
+
+  AdminShared.init('banners').then((email) => {
+    if (email) loadBanners();
+  });
+</script>
+</body>
+</html>

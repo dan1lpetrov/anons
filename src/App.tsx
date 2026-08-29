@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SearchX } from 'lucide-react';
+import { BottomNav } from './components/BottomNav';
 import { CartView } from './components/CartView';
 import { CategoryFilter } from './components/CategoryFilter';
 import { CatalogControls } from './components/CatalogControls';
 import { Header } from './components/Header';
+import { Home } from './components/Home';
 import { OrderSuccess } from './components/OrderSuccess';
 import { Pagination } from './components/Pagination';
 import { ProductCard, type ProductDebugStats } from './components/ProductCard';
@@ -12,7 +14,7 @@ import { products as seedProducts } from './data/products';
 import { sales } from './data/sales';
 import { useCart } from './hooks/useCart';
 import { useTelegram } from './hooks/useTelegram';
-import type { CatalogFilters, CategoryId, Order, Product, Screen, SortOption } from './types';
+import type { Banner, CatalogFilters, CategoryId, Order, Product, Screen, SortOption } from './types';
 import { filterAndSortProducts, getAvailableCategories, getAvailableSizes } from './utils/catalog';
 import { logProductEvent, logProductEvents } from './utils/events';
 import {
@@ -40,9 +42,10 @@ export default function App() {
   const { tg, user, haptic, showAlert } = useTelegram();
   const [products, setProducts] = useState<Product[]>(seedProducts);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+  const [banners, setBanners] = useState<Banner[]>([]);
   const cart = useCart(products);
 
-  const [screen, setScreen] = useState<Screen>('catalog');
+  const [screen, setScreen] = useState<Screen>('home');
   const [category, setCategory] = useState<CategoryId | 'all'>('all');
   const [filters, setFilters] = useState<CatalogFilters>({ search: '', sizes: [], brands: [] });
   const [sort, setSort] = useState<SortOption>('recommended');
@@ -61,6 +64,17 @@ export default function App() {
       .finally(() => {
         if (!cancelled) setIsLoadingProducts(false);
       });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/banners')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: unknown) => {
+        if (!cancelled && Array.isArray(data)) setBanners(data as Banner[]);
+      })
+      .catch(() => {});
     return () => { cancelled = true; };
   }, []);
 
@@ -143,11 +157,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    window.history.replaceState({ screen: 'catalog', productId: null }, '');
+    window.history.replaceState({ screen: 'home', productId: null }, '');
 
     const handlePopState = (event: PopStateEvent) => {
       const state = event.state as { screen: Screen; productId: string | null } | null;
-      const targetScreen = state?.screen ?? 'catalog';
+      const targetScreen = state?.screen ?? 'home';
       setScreen(targetScreen);
       setSelectedProductId(state?.productId ?? null);
       const savedY = scrollPositions.current[targetScreen] ?? 0;
@@ -190,7 +204,7 @@ export default function App() {
   useEffect(() => {
     if (!tg) return;
 
-    const showBack = screen !== 'catalog' && screen !== 'success';
+    const showBack = screen !== 'home' && screen !== 'success';
     if (showBack) {
       tg.BackButton.show();
       tg.BackButton.onClick(goBack);
@@ -243,24 +257,41 @@ export default function App() {
     navigate('success');
   };
 
+  const showBottomNav = screen === 'home' || screen === 'catalog' || screen === 'cart';
+
   return (
-    <div className="app">
+    <div className={`app ${showBottomNav ? 'app--with-nav' : ''}`}>
       <Header
         title={SCREEN_TITLES[screen]}
         cartCount={cart.totalItems}
-        showCart={screen === 'catalog' || screen === 'product'}
+        showCart={screen === 'home' || screen === 'catalog' || screen === 'product'}
         onCartClick={() => navigate('cart')}
         searchValue={filters.search}
         onSearchChange={(search) => setFilters({ ...filters, search })}
-        onHomeClick={() => navigate('catalog')}
+        onHomeClick={() => navigate('home')}
       />
 
       <main className="app-main">
+        {screen === 'home' && (
+          <Home
+            products={products}
+            categories={availableCategories}
+            banners={banners}
+            isLoading={isLoadingProducts}
+            onOpenProduct={openProduct}
+            onViewCategory={(categoryId) => {
+              setCategory(categoryId);
+              navigate('catalog');
+            }}
+            onViewAll={() => {
+              setCategory('all');
+              navigate('catalog');
+            }}
+          />
+        )}
+
         {screen === 'catalog' && (
           <>
-            <p className="catalog-intro">
-              Розпродажі одягу з популярних магазинів. Оберіть товар — ми сформуємо замовлення для ручного викупу.
-            </p>
             <CategoryFilter active={category} categories={availableCategories} onChange={setCategory} />
             <div className="catalog-layout">
               <CatalogControls
@@ -325,10 +356,12 @@ export default function App() {
         {screen === 'success' && lastOrder && (
           <OrderSuccess
             order={lastOrder}
-            onContinue={() => navigate('catalog')}
+            onContinue={() => navigate('home')}
           />
         )}
       </main>
+
+      {showBottomNav && <BottomNav active={screen} cartCount={cart.totalItems} onNavigate={navigate} />}
     </div>
   );
 }

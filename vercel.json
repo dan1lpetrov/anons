@@ -2,7 +2,8 @@
   "rewrites": [
     { "source": "/admin", "destination": "/admin.html" },
     { "source": "/admin/upload", "destination": "/admin-upload.html" },
-    { "source": "/admin/weights", "destination": "/admin-weights.html" }
+    { "source": "/admin/weights", "destination": "/admin-weights.html" },
+    { "source": "/admin/banners", "destination": "/admin-banners.html" }
   ],
   "crons": [
     { "path": "/api/cron/recompute-scores", "schedule": "0 3 * * *" }

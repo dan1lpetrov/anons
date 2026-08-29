@@ -83,3 +83,13 @@ export interface CatalogFilters {
   sizes: string[];
   brands: SaleId[];
 }
+
+export interface Banner {
+  id: number;
+  imageUrl: string;
+  title: string;
+  subtitle: string;
+  linkCategoryId: string | null;
+  sortOrder: number;
+  active: boolean;
+}

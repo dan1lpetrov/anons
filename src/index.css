@@ -215,7 +215,9 @@ img {
   border-radius: var(--radius-sm);
   background: var(--tg-secondary-bg);
   font-size: 20px;
-  display: flex;
+  /* Hidden on mobile — the bottom nav owns cart navigation there; shown again
+     at desktop widths (>=720px) once the bottom nav hides, per DESIGN.md. */
+  display: none;
   align-items: center;
   justify-content: center;
 }
@@ -1150,6 +1152,214 @@ img {
   margin-bottom: 24px;
 }
 
+/* ===== Home screen ===== */
+
+.home-banner {
+  margin: 4px -16px 0;
+}
+
+.home-banner__track {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.home-banner__track::-webkit-scrollbar {
+  display: none;
+}
+
+.home-banner__slide {
+  position: relative;
+  flex: 0 0 100%;
+  scroll-snap-align: start;
+  aspect-ratio: 4 / 5;
+  text-align: left;
+}
+
+.home-banner__slide img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.home-banner__caption {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  backdrop-filter: blur(4px);
+}
+
+.home-banner__caption strong {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.home-banner__caption span {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.home-banner__dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.home-banner__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  transition: width 0.15s, background 0.15s;
+}
+
+.home-banner__dot.active {
+  width: 16px;
+  background: var(--accent);
+}
+
+.home-section {
+  margin-top: 28px;
+}
+
+.home-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.home-section__header h2 {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.home-section__view-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--tg-hint);
+}
+
+.home-product-row {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.home-product-row::-webkit-scrollbar {
+  display: none;
+}
+
+.home-product-row .product-card {
+  flex: 0 0 148px;
+  scroll-snap-align: start;
+}
+
+.home-category-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.home-category-tile {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background-color: var(--surface);
+  background-size: cover;
+  background-position: center;
+  text-align: left;
+}
+
+.home-category-tile__label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 14px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 65%);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.bottom-nav {
+  position: fixed;
+  z-index: 10;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  background: var(--tg-bg);
+  border-top: 1px solid var(--border);
+  padding: 6px max(16px, calc((100% - var(--content-max)) / 2)) calc(6px + env(safe-area-inset-bottom, 0px));
+}
+
+.bottom-nav__tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 4px;
+  color: var(--tg-hint);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.bottom-nav__tab.active {
+  color: var(--accent);
+}
+
+.bottom-nav__icon-wrap {
+  position: relative;
+  display: flex;
+}
+
+.bottom-nav__badge {
+  position: absolute;
+  top: -4px;
+  right: -8px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app--with-nav .app-main {
+  padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+}
+
 /* ===== Small phones ===== */
 @media (max-width: 359px) {
   .product-grid {
@@ -1202,6 +1412,18 @@ img {
 @media (min-width: 720px) {
   :root {
     --content-max: 900px;
+  }
+
+  .cart-button {
+    display: flex;
+  }
+
+  .bottom-nav {
+    display: none;
+  }
+
+  .app--with-nav .app-main {
+    padding-bottom: 24px;
   }
 
   .category-filter {

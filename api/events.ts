@@ -225,19 +225,23 @@ async function loadHeatmap(days: number) {
   return { cells: grid, max };
 }
 
-interface SaleWindowRow {
+interface SaleEventRow {
+  id: number;
   sale_id: string;
+  name: string;
   end_date: string | null;
 }
 
 async function loadSalesEnding() {
-  const { rows } = await db.query<SaleWindowRow>(
-    `SELECT sale_id, end_date FROM sale_windows WHERE active = true ORDER BY end_date ASC NULLS LAST LIMIT $1`,
+  const { rows } = await db.query<SaleEventRow>(
+    `SELECT id, sale_id, name, end_date FROM sale_events WHERE active = true ORDER BY end_date ASC NULLS LAST LIMIT $1`,
     [SALES_ENDING_LIMIT],
   );
   const now = Date.now();
   return rows.map((r) => ({
+    id: r.id,
     saleId: r.sale_id,
+    name: r.name,
     endDate: r.end_date,
     daysLeft: r.end_date ? Math.ceil((new Date(r.end_date).getTime() - now) / 86_400_000) : null,
   }));
@@ -260,14 +264,23 @@ interface TopProductRow {
 }
 
 async function loadTopProducts(days: number) {
+  // A SKU can be live in more than one campaign at once — dedupe to one row per product id
+  // (cheapest active price, same rule as GET /api/products) before joining scores/events, so it
+  // doesn't appear twice in the dashboard table.
   const { rows } = await db.query<TopProductRow>(
-    `SELECT p.id, p.data, p.sale_id, s.score,
+    `SELECT d.id, d.data, d.sale_id, s.score,
        COUNT(*) FILTER (WHERE e.event_type = 'view') AS views,
        COUNT(*) FILTER (WHERE e.event_type = 'order') AS orders
-     FROM products p
-     LEFT JOIN product_scores s ON s.product_id = p.id
-     LEFT JOIN product_events e ON e.product_id = p.id AND e.created_at >= now() - ($2 || ' days')::interval
-     GROUP BY p.id, p.data, p.sale_id, s.score
+     FROM (
+       SELECT DISTINCT ON (p.id) p.id, p.data, p.sale_id
+       FROM products p
+       JOIN sale_events se ON se.id = p.sale_event_id
+       WHERE se.active IS NOT FALSE AND (se.end_date IS NULL OR se.end_date > now())
+       ORDER BY p.id, (p.data->>'price')::numeric ASC
+     ) d
+     LEFT JOIN product_scores s ON s.product_id = d.id
+     LEFT JOIN product_events e ON e.product_id = d.id AND e.created_at >= now() - ($2 || ' days')::interval
+     GROUP BY d.id, d.data, d.sale_id, s.score
      ORDER BY s.score DESC NULLS LAST
      LIMIT $1`,
     [TOP_PRODUCTS_LIMIT, days],

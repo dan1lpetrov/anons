@@ -39,6 +39,9 @@ async function runEnsureSchema(): Promise<void> {
           updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
       `);
+      // Deprecated by sale_events below (kept, unused, rather than dropped — safer on live prod
+      // data than an irreversible DROP TABLE). "A sale" used to be modeled 1:1 with a brand; it's
+      // now a campaign, of which a brand can have several live at once.
       await client.query(`
         CREATE TABLE IF NOT EXISTS sale_windows (
           sale_id TEXT PRIMARY KEY,
@@ -46,6 +49,53 @@ async function runEnsureSchema(): Promise<void> {
           active BOOLEAN NOT NULL DEFAULT true,
           updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
+      `);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS sale_events (
+          id SERIAL PRIMARY KEY,
+          sale_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          end_date TIMESTAMPTZ,
+          active BOOLEAN NOT NULL DEFAULT true,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+      `);
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS sale_events_brand ON sale_events (sale_id);
+      `);
+      // One-time migration: products.id alone used to be the primary key (one row per SKU,
+      // globally). Multiple concurrently-live campaigns per brand means the same SKU can now
+      // have one row per campaign it's live in, so the key widens to (id, sale_event_id).
+      await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS sale_event_id INTEGER;`);
+      await client.query(`
+        INSERT INTO sale_events (sale_id, name, end_date, active)
+        SELECT DISTINCT p.sale_id, initcap(p.sale_id) || ' 1', sw.end_date, COALESCE(sw.active, true)
+        FROM products p
+        LEFT JOIN sale_windows sw ON sw.sale_id = p.sale_id
+        WHERE p.sale_event_id IS NULL
+          AND NOT EXISTS (SELECT 1 FROM sale_events se WHERE se.sale_id = p.sale_id)
+      `);
+      await client.query(`
+        UPDATE products p SET sale_event_id = se.id
+        FROM sale_events se
+        WHERE p.sale_event_id IS NULL AND se.sale_id = p.sale_id
+      `);
+      await client.query(`ALTER TABLE products ALTER COLUMN sale_event_id SET NOT NULL;`);
+      await client.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.key_column_usage
+            WHERE table_name = 'products' AND constraint_name = 'products_pkey' AND column_name = 'sale_event_id'
+          ) THEN
+            ALTER TABLE products DROP CONSTRAINT products_pkey;
+            ALTER TABLE products ADD PRIMARY KEY (id, sale_event_id);
+          END IF;
+        END $$;
+      `);
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS products_sale_event_idx ON products (sale_event_id);
       `);
       await client.query(`
         CREATE TABLE IF NOT EXISTS price_history (

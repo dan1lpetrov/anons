@@ -47,12 +47,16 @@ function percentileRanks(values: Map<string, number>): Map<string, number> {
 async function recompute(): Promise<{ scored: number; similarPairs: number }> {
   const WEIGHTS = await getWeights();
 
+  // Same cheapest-active-row-wins dedupe as GET /api/products (api/products.ts) — a SKU can be
+  // live in more than one campaign at once, and scoring must see the same effective product the
+  // storefront shows, not double-count it.
   const { rows: products } = await db.query<{ id: string; data: ProductData }>(`
-    SELECT p.id, p.data
+    SELECT DISTINCT ON (p.id) p.id, p.data
     FROM products p
-    LEFT JOIN sale_windows w ON w.sale_id = p.sale_id
-    WHERE w.active IS NOT FALSE
-      AND (w.end_date IS NULL OR w.end_date > now())
+    JOIN sale_events se ON se.id = p.sale_event_id
+    WHERE se.active IS NOT FALSE
+      AND (se.end_date IS NULL OR se.end_date > now())
+    ORDER BY p.id, (p.data->>'price')::numeric ASC
   `);
 
   if (products.length === 0) {

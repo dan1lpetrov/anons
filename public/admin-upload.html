@@ -10,6 +10,17 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/assets/admin.css" />
+<style>
+  .campaign-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+  .campaign-option:last-child { border-bottom: none; }
+</style>
 </head>
 <body>
 
@@ -27,7 +38,7 @@
     <div class="admin-content__inner">
       <div>
         <h1>Додати розпродаж</h1>
-        <p class="hint">Встав JSON або JSONL зі скрапера (по одному товару на рядок) або завантаж файл — формат нормалізується автоматично, і сайт одразу підхопить нові дані.</p>
+        <p class="hint">Встав JSON або JSONL зі скрапера (по одному товару на рядок) або завантаж файл — формат нормалізується автоматично. Завантаження нічого не видаляє: товари додаються або оновлюють ціну в межах обраної кампанії.</p>
       </div>
 
       <section id="uploadSection">
@@ -35,11 +46,17 @@
         <input id="file" type="file" accept="application/json,.json,.jsonl,text/plain" />
         <label for="json">Або встав JSON вручну</label>
         <textarea id="json" placeholder="[ { &quot;id&quot;: &quot;...&quot;, &quot;name&quot;: &quot;...&quot;, ... } ]"></textarea>
-        <label for="endDate">Дійсні до (необов'язково)</label>
-        <input id="endDate" type="date" />
-        <p class="hint">Якщо вказати дату — після неї товари з цього завантаження автоматично зникнуть із сайту. Порожнє поле нічого не змінює в термінах, які вже задані.</p>
         <div class="row">
           <button id="loadCurrent" class="secondary" type="button">Завантажити поточні товари</button>
+        </div>
+
+        <div id="campaignSection" class="hidden" style="margin-top: 16px;">
+          <label>Кампанія (<span id="campaignBrand"></span>)</label>
+          <div id="campaignPicker"></div>
+        </div>
+        <div id="campaignHint" class="hint"></div>
+
+        <div class="row" style="margin-top: 16px;">
           <button id="upload" class="primary" type="button">Залити на сайт</button>
         </div>
         <div id="status" class="status"></div>
@@ -55,7 +72,10 @@
   const statusEl = document.getElementById('status');
   const uploadBtn = document.getElementById('upload');
   const loadBtn = document.getElementById('loadCurrent');
-  const endDateInput = document.getElementById('endDate');
+  const campaignSection = document.getElementById('campaignSection');
+  const campaignBrandEl = document.getElementById('campaignBrand');
+  const campaignPicker = document.getElementById('campaignPicker');
+  const campaignHint = document.getElementById('campaignHint');
 
   function parseProductsPayload(text) {
     const trimmed = text.trim();
@@ -162,6 +182,7 @@
     const file = fileInput.files?.[0];
     if (!file) return;
     jsonArea.value = await file.text();
+    detectCampaign();
   });
 
   loadBtn.addEventListener('click', async () => {
@@ -175,10 +196,121 @@
       const data = await res.json();
       jsonArea.value = JSON.stringify(data, null, 2);
       AdminShared.setStatus(statusEl, 'ok', `Завантажено ${data.length} товар(ів).`);
+      detectCampaign();
     } catch (err) {
       AdminShared.setStatus(statusEl, 'err', 'Помилка: ' + err.message);
     }
   });
+
+  let jsonAreaTimer = null;
+  jsonArea.addEventListener('input', () => {
+    clearTimeout(jsonAreaTimer);
+    jsonAreaTimer = setTimeout(detectCampaign, 400);
+  });
+
+  // --- Campaign detection/selection ---
+  // A "sale" is a campaign, not a brand — a brand can have several campaigns live at once, each
+  // with its own name/end date, independently paused/resumed/deleted from /admin/sales. Every
+  // upload targets exactly one campaign: a brand-new one (auto-suggested name, editable) or one
+  // of the brand's existing campaigns (picked here, to add/update products in it).
+  let detectedBrand = null;
+  let campaigns = [];
+  let selectedCampaignId = null; // null = create a new campaign
+
+  function nextCampaignName(brand, existing) {
+    const base = (SALES[brand] && SALES[brand].name) || brand;
+    const taken = new Set(existing.map((c) => c.name));
+    let n = existing.length + 1;
+    let candidate = `${base} ${n}`;
+    while (taken.has(candidate)) {
+      n++;
+      candidate = `${base} ${n}`;
+    }
+    return candidate;
+  }
+
+  function renderCampaignPicker() {
+    const suggested = nextCampaignName(detectedBrand, campaigns);
+    const rows = [];
+    rows.push(`
+      <label class="campaign-option">
+        <input type="radio" name="campaignChoice" value="new" ${selectedCampaignId === null ? 'checked' : ''} />
+        Нова кампанія:
+        <input id="newCampaignName" type="text" value="${escapeHtml(suggested)}" style="width: 220px;" />
+        <span class="hint">дійсна до</span>
+        <input id="newCampaignEndDate" type="date" />
+      </label>
+    `);
+    campaigns.forEach((c) => {
+      const status = c.active ? 'активна' : 'зупинена';
+      const end = c.endDate ? new Date(c.endDate).toLocaleDateString('uk-UA') : 'без дати';
+      rows.push(`
+        <label class="campaign-option">
+          <input type="radio" name="campaignChoice" value="${c.id}" ${selectedCampaignId === c.id ? 'checked' : ''} />
+          ${escapeHtml(c.name)} — ${status}, ${end}, товарів: ${c.productCount}
+        </label>
+      `);
+    });
+    campaignPicker.innerHTML = rows.join('');
+    campaignPicker.querySelectorAll('input[name="campaignChoice"]').forEach((input) => {
+      input.addEventListener('change', (e) => {
+        selectedCampaignId = e.target.value === 'new' ? null : Number(e.target.value);
+      });
+    });
+  }
+
+  function escapeHtml(s) {
+    const div = document.createElement('div');
+    div.textContent = s;
+    return div.innerHTML;
+  }
+
+  async function detectCampaign() {
+    let parsed;
+    try {
+      parsed = parseProductsPayload(jsonArea.value).map(normalizeProduct);
+    } catch {
+      campaignSection.classList.add('hidden');
+      campaignHint.textContent = '';
+      detectedBrand = null;
+      return;
+    }
+
+    const brands = [...new Set(parsed.map((p) => p.saleId).filter(Boolean))];
+    if (brands.length !== 1) {
+      campaignSection.classList.add('hidden');
+      campaignHint.textContent =
+        brands.length === 0
+          ? 'Не вдалося визначити бренд товарів.'
+          : 'В одному завантаженні мають бути товари лише одного бренду.';
+      detectedBrand = null;
+      return;
+    }
+
+    const brandChanged = detectedBrand !== brands[0];
+    detectedBrand = brands[0];
+    campaignHint.textContent = '';
+    campaignBrandEl.textContent = (SALES[detectedBrand] && SALES[detectedBrand].name) || detectedBrand;
+
+    try {
+      const res = await fetch(`/api/sales?saleId=${encodeURIComponent(detectedBrand)}`, {
+        cache: 'no-store',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      campaigns = await res.json();
+    } catch {
+      campaigns = [];
+    }
+
+    // Keep whatever the admin already picked if it's still valid — re-parsing on every
+    // keystroke shouldn't silently reset their choice back to "new campaign".
+    if (brandChanged || !campaigns.some((c) => c.id === selectedCampaignId)) {
+      selectedCampaignId = null;
+    }
+    campaignSection.classList.remove('hidden');
+    renderCampaignPicker();
+  }
 
   // Vercel обмежує тіло запиту ~4.5 MB — дробимо великі заливки на батчі.
   const UPLOAD_BATCH_MAX_BYTES = 3_500_000;
@@ -188,7 +320,7 @@
     let current = [];
     for (const product of products) {
       const trial = current.concat(product);
-      const bytes = JSON.stringify({ products: trial, mode: 'replace' }).length;
+      const bytes = JSON.stringify({ products: trial, saleEventId: 0 }).length;
       if (current.length > 0 && bytes > UPLOAD_BATCH_MAX_BYTES) {
         batches.push(current);
         current = [product];
@@ -208,12 +340,34 @@
       AdminShared.setStatus(statusEl, 'err', err.message || 'Невалідний JSON.');
       return;
     }
-
-    const batches = chunkProductsForUpload(parsed);
-    const endDate = endDateInput.value || null;
+    if (!detectedBrand) {
+      AdminShared.setStatus(statusEl, 'err', 'Спершу потрібно однозначно визначити бренд товарів.');
+      return;
+    }
 
     uploadBtn.disabled = true;
     try {
+      let saleEventId = selectedCampaignId;
+      if (saleEventId === null) {
+        const nameInput = document.getElementById('newCampaignName');
+        const endDateInput = document.getElementById('newCampaignEndDate');
+        AdminShared.setStatus(statusEl, 'pending', 'Створюю кампанію...');
+        const res = await fetch('/api/sales', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            saleId: detectedBrand,
+            name: nameInput.value.trim() || undefined,
+            endDate: endDateInput.value || null,
+          }),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+        saleEventId = body.id;
+      }
+
+      const batches = chunkProductsForUpload(parsed);
       for (let i = 0; i < batches.length; i++) {
         const batchLabel = batches.length > 1 ? ` (${i + 1}/${batches.length})` : '';
         AdminShared.setStatus(statusEl, 'pending', `Заливаю...${batchLabel}`);
@@ -221,11 +375,7 @@
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            products: batches[i],
-            mode: i === 0 ? 'replace' : 'append',
-            endDate: i === 0 ? endDate : null,
-          }),
+          body: JSON.stringify({ products: batches[i], saleEventId }),
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
@@ -237,6 +387,9 @@
       } catch {
         AdminShared.setStatus(statusEl, 'ok', `Залито ${parsed.length} товар(ів), але не вдалося перерахувати рейтинги — вони оновляться за розкладом.`);
       }
+      await detectCampaign();
+      selectedCampaignId = saleEventId;
+      renderCampaignPicker();
     } catch (err) {
       AdminShared.setStatus(statusEl, 'err', 'Помилка: ' + err.message);
     } finally {

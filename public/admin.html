@@ -263,7 +263,7 @@
         (s) => `
       <div class="list-row">
         <div>
-          <div class="list-row__name">${s.saleId}</div>
+          <div class="list-row__name">${escapeHtml(s.name)} <span class="hint">(${s.saleId})</span></div>
           <div class="list-row__sub">${s.endDate ? 'завершення ' + new Date(s.endDate).toLocaleDateString('uk-UA') : 'дата не встановлена'}</div>
         </div>
         ${saleBadge(s.daysLeft)}

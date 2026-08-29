@@ -174,7 +174,10 @@
       const res = await fetch('/api/sales', { cache: 'no-store', credentials: 'include' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const all = await res.json();
-      activeSales = all.filter((s) => s.active);
+      // GET /api/sales now returns one row per campaign, and a brand can have several active
+      // campaigns at once — a banner links to the brand, not a specific campaign, so dedupe to
+      // one option per saleId.
+      activeSales = [...new Map(all.filter((s) => s.active).map((s) => [s.saleId, s])).values()];
     } catch (err) {
       activeSales = [];
     }

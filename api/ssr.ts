@@ -48,8 +48,9 @@ async function renderProduct(req: VercelRequest, res: VercelResponse, id: string
       const { rows } = await db.query<{ data: ProductData }>(
         `SELECT p.data
          FROM products p
-         LEFT JOIN sale_windows w ON w.sale_id = p.sale_id
-         WHERE p.id = $1 AND (w.active IS NOT FALSE) AND (w.end_date IS NULL OR w.end_date > now())
+         JOIN sale_events se ON se.id = p.sale_event_id
+         WHERE p.id = $1 AND (se.active IS NOT FALSE) AND (se.end_date IS NULL OR se.end_date > now())
+         ORDER BY (p.data->>'price')::numeric ASC
          LIMIT 1`,
         [id],
       );

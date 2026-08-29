@@ -1182,7 +1182,6 @@ img {
   display: flex;
   gap: 12px;
   overflow-x: auto;
-  touch-action: pan-x;
   scroll-snap-type: x mandatory;
   padding-bottom: 4px;
   scrollbar-width: none;

@@ -30,6 +30,7 @@ export function ProductDetail({ product, onAddToCart, onBack }: ProductDetailPro
   const [pricePoints, setPricePoints] = useState<PricePoint[]>([]);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const galleryTouchStart = useRef<{ x: number; y: number } | null>(null);
+  const heroRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setSize(regularSizes[0] ?? tallSizes[0] ?? '');
@@ -59,6 +60,26 @@ export function ProductDetail({ product, onAddToCart, onBack }: ProductDetailPro
   const discount = discountPercent(price, originalPrice);
   const images = selectedColor?.images.length ? selectedColor.images : [product.image];
 
+  // touch-action alone isn't enough here: this carousel has no native scroll
+  // view backing it (it's driven entirely by `transform`), so Telegram's own
+  // swipe-to-close gesture recognizer — which runs outside the DOM — can still
+  // grab a diagonal touch on it. preventDefault() on the drag is what actually
+  // claims the gesture. React attaches touchmove as passive by default, so
+  // this has to be a manually attached, non-passive listener.
+  useEffect(() => {
+    const hero = heroRef.current;
+    if (!hero || images.length < 2) return;
+    const handleTouchMove = (event: TouchEvent) => {
+      const start = galleryTouchStart.current;
+      if (!start) return;
+      event.preventDefault();
+      const touch = event.touches[0];
+      setDragPx(touch.clientX - start.x);
+    };
+    hero.addEventListener('touchmove', handleTouchMove, { passive: false });
+    return () => hero.removeEventListener('touchmove', handleTouchMove);
+  }, [images.length]);
+
   const goToImage = (delta: number) => {
     setActiveImage((prev) => {
       const next = (prev + delta + images.length) % images.length;
@@ -85,17 +106,12 @@ export function ProductDetail({ product, onAddToCart, onBack }: ProductDetailPro
       <div className="product-detail__gallery">
         <div
           className="product-detail__hero"
+          ref={heroRef}
           onTouchStart={(event) => {
             event.stopPropagation();
             const touch = event.touches[0];
             galleryTouchStart.current = { x: touch.clientX, y: touch.clientY };
             setDragging(true);
-          }}
-          onTouchMove={(event) => {
-            const start = galleryTouchStart.current;
-            if (!start || images.length < 2) return;
-            const touch = event.touches[0];
-            setDragPx(touch.clientX - start.x);
           }}
           onTouchEnd={(event) => {
             event.stopPropagation();

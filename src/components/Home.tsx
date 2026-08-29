@@ -11,12 +11,13 @@ interface HomeProps {
   onOpenProduct: (id: string) => void;
   onViewCategory: (categoryId: string) => void;
   onViewSale: (saleId: string) => void;
+  onOpenLink: (url: string) => void;
   onViewAll: () => void;
 }
 
 const TOP_PRODUCTS_COUNT = 10;
 
-export function Home({ products, categories, banners, isLoading, onOpenProduct, onViewCategory, onViewSale, onViewAll }: HomeProps) {
+export function Home({ products, categories, banners, isLoading, onOpenProduct, onViewCategory, onViewSale, onOpenLink, onViewAll }: HomeProps) {
   const topProducts = products.slice(0, TOP_PRODUCTS_COUNT);
 
   return (
@@ -28,7 +29,8 @@ export function Home({ products, categories, banners, isLoading, onOpenProduct, 
       <BannerCarousel
         banners={banners}
         onSelect={(banner) => {
-          if (banner.linkSaleId) onViewSale(banner.linkSaleId);
+          if (banner.linkUrl) onOpenLink(banner.linkUrl);
+          else if (banner.linkSaleId) onViewSale(banner.linkSaleId);
           else if (banner.linkCategoryId) onViewCategory(banner.linkCategoryId);
           else onViewAll();
         }}

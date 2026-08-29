@@ -71,7 +71,7 @@ function OrderRoute({ onContinue }: { onContinue: () => void }) {
 
 export default function App() {
   const telegram = useTelegram();
-  const { tg, user, haptic, showAlert } = telegram;
+  const { tg, user, haptic, showAlert, openLink } = telegram;
   const [products, setProducts] = useState<Product[]>(seedProducts);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -267,6 +267,10 @@ export default function App() {
                   onOpenProduct={openProduct}
                   onViewCategory={(categoryId) => goTo(`/catalog/${encodeURIComponent(categoryId)}`)}
                   onViewSale={(saleId) => goTo(`/catalog?brands=${encodeURIComponent(saleId)}`)}
+                  onOpenLink={(url) => {
+                    haptic('light');
+                    openLink(url);
+                  }}
                   onViewAll={() => goTo('/catalog')}
                 />
               }

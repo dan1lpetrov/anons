@@ -15,7 +15,8 @@
   .banner-form-grid .full { grid-column: 1 / -1; }
   .banner-form-grid label { display: block; margin-bottom: 4px; }
   .banner-form-grid input[type="text"],
-  .banner-form-grid input[type="number"] { width: 100%; }
+  .banner-form-grid input[type="number"],
+  .banner-form-grid select { width: 100%; }
   .banner-row { display: grid; grid-template-columns: 72px 1fr auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); }
   .banner-row:last-child { border-bottom: none; }
   .banner-row__thumb { width: 72px; height: 72px; border-radius: var(--radius-sm); object-fit: cover; background: var(--bg); }
@@ -48,7 +49,7 @@
     <div class="admin-content__inner">
       <div>
         <h1>Банери на головній</h1>
-        <p class="hint">Керує каруселлю банерів на головному екрані сторефронту. Банер може вести на категорію (id такий самий, як categoryId у товарах, наприклад <code>shoes</code>, <code>clothing</code>) або на активний розпродаж — або нікуди.</p>
+        <p class="hint">Керує каруселлю банерів на головному екрані сторефронту. Кожен банер обовʼязково веде кудись: на категорію, на активний розпродаж або на будь-яке зовнішнє посилання.</p>
       </div>
 
       <section id="addSection">
@@ -76,18 +77,22 @@
           <div class="full">
             <label>Куди веде банер</label>
             <div class="link-type-group">
-              <label><input type="radio" name="linkType" value="none" checked /> Немає</label>
-              <label><input type="radio" name="linkType" value="category" /> Категорія</label>
+              <label><input type="radio" name="linkType" value="category" checked /> Категорія</label>
               <label><input type="radio" name="linkType" value="sale" /> Розпродаж</label>
+              <label><input type="radio" name="linkType" value="url" /> URL</label>
             </div>
           </div>
-          <div class="full hidden" id="categoryField">
+          <div class="full" id="categoryField">
             <label for="newCategory">Категорія</label>
-            <input id="newCategory" type="text" placeholder="shoes" />
+            <select id="newCategory"></select>
           </div>
           <div class="full hidden" id="saleField">
             <label for="newSale">Розпродаж</label>
             <select id="newSale"></select>
+          </div>
+          <div class="full hidden" id="urlField">
+            <label for="newUrl">URL</label>
+            <input id="newUrl" type="text" placeholder="https://..." />
           </div>
           <div>
             <label for="newOrder">Порядок</label>
@@ -137,6 +142,8 @@
   const categoryField = document.getElementById('categoryField');
   const saleField = document.getElementById('saleField');
   const newSale = document.getElementById('newSale');
+  const urlField = document.getElementById('urlField');
+  const newUrl = document.getElementById('newUrl');
 
   const bannersList = document.getElementById('bannersList');
   const listStatus = document.getElementById('listStatus');
@@ -149,6 +156,18 @@
     puma: { name: 'Puma' },
   };
   let activeSales = [];
+
+  // Mirrors src/data/categories.ts's CATEGORY_LABELS — categoryId isn't a
+  // closed enum, so unknown ids just fall back to showing the raw id.
+  const CATEGORY_LABELS = {
+    shoes: 'Взуття',
+    clothing: 'Одяг',
+    accessories: 'Аксесуари',
+    tshirts: 'Футболки',
+    pants: 'Штани',
+    jackets: 'Куртки',
+  };
+  let availableCategories = [];
 
   async function loadSalesOptions() {
     try {
@@ -175,6 +194,41 @@
     });
   }
 
+  async function loadCategoryOptions() {
+    try {
+      const res = await fetch('/api/products', { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const products = await res.json();
+      const seen = new Set();
+      availableCategories = [];
+      products.forEach((p) => {
+        if (p.categoryId && !seen.has(p.categoryId)) {
+          seen.add(p.categoryId);
+          availableCategories.push(p.categoryId);
+        }
+      });
+      availableCategories.sort((a, b) =>
+        (CATEGORY_LABELS[a] || a).localeCompare(CATEGORY_LABELS[b] || b, 'uk'),
+      );
+    } catch (err) {
+      availableCategories = [];
+    }
+    addCategory.innerHTML = '';
+    if (availableCategories.length === 0) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = 'Немає доступних категорій';
+      addCategory.appendChild(opt);
+      return;
+    }
+    availableCategories.forEach((id) => {
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.textContent = CATEGORY_LABELS[id] || id;
+      addCategory.appendChild(opt);
+    });
+  }
+
   function getLinkType() {
     return document.querySelector('input[name="linkType"]:checked').value;
   }
@@ -188,6 +242,7 @@
     const type = getLinkType();
     categoryField.classList.toggle('hidden', type !== 'category');
     saleField.classList.toggle('hidden', type !== 'sale');
+    urlField.classList.toggle('hidden', type !== 'url');
   }
 
   linkTypeRadios.forEach((radio) => radio.addEventListener('change', updateLinkFieldVisibility));
@@ -237,16 +292,20 @@
     addSubtitle.value = banner.subtitle || '';
     addOrder.value = String(banner.sortOrder ?? 0);
     addActive.checked = !!banner.active;
-    if (banner.linkSaleId) {
+    newUrl.value = '';
+    if (banner.linkUrl) {
+      setLinkType('url');
+      newUrl.value = banner.linkUrl;
+    } else if (banner.linkSaleId) {
       setLinkType('sale');
-      addCategory.value = '';
       newSale.value = banner.linkSaleId;
     } else if (banner.linkCategoryId) {
       setLinkType('category');
       addCategory.value = banner.linkCategoryId;
     } else {
-      setLinkType('none');
-      addCategory.value = '';
+      // Older banners saved before a link became mandatory — fall back to
+      // "url" empty so the admin has to explicitly pick a destination now.
+      setLinkType('url');
     }
     formTitle.textContent = 'Редагувати банер';
     addBtn.textContent = 'Зберегти зміни';
@@ -262,8 +321,8 @@
     updateImagePreview();
     addTitle.value = '';
     addSubtitle.value = '';
-    addCategory.value = '';
-    setLinkType('none');
+    newUrl.value = '';
+    setLinkType('category');
     addOrder.value = '0';
     addActive.checked = true;
     formTitle.textContent = 'Додати банер';
@@ -311,7 +370,8 @@
       const meta = document.createElement('div');
       meta.className = 'banner-row__meta';
       const saleLabel = banner.linkSaleId ? (SALES[banner.linkSaleId] && SALES[banner.linkSaleId].name) || banner.linkSaleId : '';
-      meta.textContent = `#${banner.sortOrder} · ${banner.active ? 'Активний' : 'Вимкнений'}${banner.linkCategoryId ? ' · категорія → ' + banner.linkCategoryId : ''}${saleLabel ? ' · розпродаж → ' + saleLabel : ''}`;
+      const categoryLabel = banner.linkCategoryId ? CATEGORY_LABELS[banner.linkCategoryId] || banner.linkCategoryId : '';
+      meta.textContent = `#${banner.sortOrder} · ${banner.active ? 'Активний' : 'Вимкнений'}${categoryLabel ? ' · категорія → ' + categoryLabel : ''}${saleLabel ? ' · розпродаж → ' + saleLabel : ''}${banner.linkUrl ? ' · URL → ' + banner.linkUrl : ''}`;
       body.append(title, meta);
 
       const actions = document.createElement('div');
@@ -383,8 +443,16 @@
     }
     const isEdit = editingId !== null;
     const linkType = getLinkType();
+    if (linkType === 'category' && !addCategory.value) {
+      AdminShared.setStatus(addStatus, 'err', 'Оберіть категорію.');
+      return;
+    }
     if (linkType === 'sale' && !newSale.value) {
       AdminShared.setStatus(addStatus, 'err', 'Оберіть активний розпродаж.');
+      return;
+    }
+    if (linkType === 'url' && !/^https?:\/\/.+/.test(newUrl.value.trim())) {
+      AdminShared.setStatus(addStatus, 'err', 'Введіть коректний URL (з http:// або https://).');
       return;
     }
     addBtn.disabled = true;
@@ -395,8 +463,9 @@
         imageUrl: addImageUrl.value.trim(),
         title: addTitle.value.trim(),
         subtitle: addSubtitle.value.trim(),
-        linkCategoryId: linkType === 'category' ? addCategory.value.trim() || null : null,
+        linkCategoryId: linkType === 'category' ? addCategory.value || null : null,
         linkSaleId: linkType === 'sale' ? newSale.value : null,
+        linkUrl: linkType === 'url' ? newUrl.value.trim() : null,
         sortOrder: Number(addOrder.value) || 0,
         active: addActive.checked,
       });
@@ -419,9 +488,9 @@
 
   AdminShared.init('banners').then((email) => {
     if (email) {
-      // Loaded together so the sale <select> already has its options by the
-      // time a banner row's "Редагувати" button becomes clickable.
-      Promise.all([loadBanners(), loadSalesOptions()]);
+      // Loaded together so the category/sale <select>s already have their
+      // options by the time a banner row's "Редагувати" button is clickable.
+      Promise.all([loadBanners(), loadSalesOptions(), loadCategoryOptions()]);
     }
   });
 </script>

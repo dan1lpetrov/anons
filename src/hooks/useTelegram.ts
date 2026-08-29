@@ -45,6 +45,14 @@ export function useTelegram() {
     return false;
   };
 
+  const openLink = (url: string) => {
+    if (tg?.openLink) {
+      tg.openLink(url);
+    } else {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  };
+
   const showAlert = (message: string) => {
     if (tg?.showAlert) {
       tg.showAlert(message);
@@ -61,6 +69,7 @@ export function useTelegram() {
     haptic,
     sendOrderData,
     showAlert,
+    openLink,
     close: () => tg?.close(),
   };
 }

@@ -50,6 +50,7 @@ interface TelegramWebApp {
   close: () => void;
   disableVerticalSwipes: () => void;
   sendData: (data: string) => void;
+  openLink: (url: string, options?: { try_instant_view?: boolean }) => void;
   showAlert: (message: string, callback?: () => void) => void;
   showConfirm: (message: string, callback?: (confirmed: boolean) => void) => void;
   onEvent: (eventType: string, callback: () => void) => void;

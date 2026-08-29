@@ -10,13 +10,14 @@ interface BannerRow {
   subtitle: string;
   linkCategoryId: string | null;
   linkSaleId: string | null;
+  linkUrl: string | null;
   sortOrder: number;
   active: boolean;
 }
 
 const SELECT_COLUMNS = `
   id, image_url AS "imageUrl", title, subtitle,
-  link_category_id AS "linkCategoryId", link_sale_id AS "linkSaleId",
+  link_category_id AS "linkCategoryId", link_sale_id AS "linkSaleId", link_url AS "linkUrl",
   sort_order AS "sortOrder", active
 `;
 
@@ -94,26 +95,30 @@ async function handlePost(req: VercelRequest, res: VercelResponse) {
   if (!email) return; // requireAdmin already sent the 401 response
 
   const body = req.body ?? {};
-  const { id, imageUrl, title, subtitle, linkCategoryId, linkSaleId, sortOrder, active } = body;
+  const { id, imageUrl, title, subtitle, linkCategoryId, linkSaleId, linkUrl, sortOrder, active } = body;
 
   if (typeof imageUrl !== 'string' || !imageUrl.trim()) {
     return res.status(400).json({ error: 'imageUrl обовʼязковий' });
   }
 
-  // A banner links to at most one destination — a sale takes priority over a
-  // category if a client somehow sends both.
-  const normalizedSaleId = typeof linkSaleId === 'string' && linkSaleId.trim() ? linkSaleId.trim() : null;
+  // A banner links to at most one destination — a custom URL takes priority
+  // over a sale, which takes priority over a category, if a client somehow
+  // sends more than one.
+  const normalizedUrl = typeof linkUrl === 'string' && linkUrl.trim() ? linkUrl.trim() : null;
+  const normalizedSaleId = normalizedUrl ? null : typeof linkSaleId === 'string' && linkSaleId.trim() ? linkSaleId.trim() : null;
 
   const values = {
     imageUrl: imageUrl.trim(),
     title: typeof title === 'string' ? title : '',
     subtitle: typeof subtitle === 'string' ? subtitle : '',
-    linkCategoryId: normalizedSaleId
-      ? null
-      : typeof linkCategoryId === 'string' && linkCategoryId.trim()
-        ? linkCategoryId.trim()
-        : null,
+    linkCategoryId:
+      normalizedUrl || normalizedSaleId
+        ? null
+        : typeof linkCategoryId === 'string' && linkCategoryId.trim()
+          ? linkCategoryId.trim()
+          : null,
     linkSaleId: normalizedSaleId,
+    linkUrl: normalizedUrl,
     sortOrder: typeof sortOrder === 'number' ? sortOrder : 0,
     active: typeof active === 'boolean' ? active : true,
   };
@@ -121,17 +126,17 @@ async function handlePost(req: VercelRequest, res: VercelResponse) {
   try {
     if (typeof id === 'number') {
       await db.query(
-        `UPDATE banners SET image_url = $2, title = $3, subtitle = $4, link_category_id = $5, link_sale_id = $6, sort_order = $7, active = $8, updated_at = now()
+        `UPDATE banners SET image_url = $2, title = $3, subtitle = $4, link_category_id = $5, link_sale_id = $6, link_url = $7, sort_order = $8, active = $9, updated_at = now()
          WHERE id = $1`,
-        [id, values.imageUrl, values.title, values.subtitle, values.linkCategoryId, values.linkSaleId, values.sortOrder, values.active],
+        [id, values.imageUrl, values.title, values.subtitle, values.linkCategoryId, values.linkSaleId, values.linkUrl, values.sortOrder, values.active],
       );
       return res.status(200).json({ ok: true, id });
     }
 
     const { rows } = await db.query<{ id: number }>(
-      `INSERT INTO banners (image_url, title, subtitle, link_category_id, link_sale_id, sort_order, active)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-      [values.imageUrl, values.title, values.subtitle, values.linkCategoryId, values.linkSaleId, values.sortOrder, values.active],
+      `INSERT INTO banners (image_url, title, subtitle, link_category_id, link_sale_id, link_url, sort_order, active)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+      [values.imageUrl, values.title, values.subtitle, values.linkCategoryId, values.linkSaleId, values.linkUrl, values.sortOrder, values.active],
     );
     return res.status(200).json({ ok: true, id: rows[0].id });
   } catch (error) {

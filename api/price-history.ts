@@ -28,11 +28,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       [productId, colorId],
     );
 
-    if (rows.length >= 2) {
-      const points: PricePoint[] = rows.map((r) => ({ price: Number(r.price), recordedAt: r.recorded_at }));
-      return res.status(200).json({ points });
-    }
-
     const { rows: productRows } = await db.query<{ data: { price: number; colors: Array<{ id: string; price?: number; originalPrice?: number }> } }>(
       `SELECT data FROM products WHERE id = $1`,
       [productId],
@@ -42,14 +37,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const price = color?.price ?? product?.price;
     const originalPrice = color?.originalPrice;
 
-    if (typeof price !== 'number' || typeof originalPrice !== 'number' || originalPrice === price) {
-      return res.status(200).json({ points: [] });
+    const points: PricePoint[] = rows.map((r) => ({ price: Number(r.price), recordedAt: r.recorded_at }));
+
+    // No recorded history yet — synthesize an original-price -> current-price
+    // pair so the chart still has something to draw for a discounted product.
+    if (points.length === 0 && typeof price === 'number' && typeof originalPrice === 'number' && originalPrice !== price) {
+      points.push({ price, recordedAt: new Date().toISOString() });
     }
 
-    const points: PricePoint[] = [
-      { price: originalPrice, recordedAt: null },
-      { price, recordedAt: rows[0]?.recorded_at ?? new Date().toISOString() },
-    ];
+    // The chart should always read as "started at full price" — prepend the
+    // known original price as a synthetic first point (no real recordedAt)
+    // whenever the recorded history doesn't already start there.
+    if (typeof originalPrice === 'number' && points[0]?.price !== originalPrice) {
+      points.unshift({ price: originalPrice, recordedAt: null });
+    }
+
     return res.status(200).json({ points });
   } catch (error) {
     console.error(error);

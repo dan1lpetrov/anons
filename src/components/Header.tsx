@@ -1,21 +1,36 @@
 import { useEffect, useRef } from 'react';
 import { Search, X } from 'lucide-react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useTelegramContext } from '../hooks/useTelegram';
 
-interface HeaderProps {
-  showSearch: boolean;
-  searchValue: string;
-  onSearchChange: (value: string) => void;
-  onSearchFocus?: () => void;
-  onHomeClick: () => void;
-}
+export function Header() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { haptic } = useTelegramContext();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-export function Header({
-  showSearch,
-  searchValue,
-  onSearchChange,
-  onSearchFocus,
-  onHomeClick,
-}: HeaderProps) {
+  // No search box on /product or /cart etc — search is a catalog-page affordance.
+  const showSearch = location.pathname === '/' || location.pathname.startsWith('/catalog');
+  const onCatalog = location.pathname.startsWith('/catalog');
+  const searchValue = onCatalog ? (searchParams.get('q') ?? '') : '';
+
+  const handleSearchChange = (value: string) => {
+    if (!onCatalog) {
+      haptic('light');
+      navigate(value ? `/catalog?q=${encodeURIComponent(value)}` : '/catalog');
+      return;
+    }
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (value) next.set('q', value);
+        else next.delete('q');
+        return next;
+      },
+      { replace: true },
+    );
+  };
+
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Plain .blur() doesn't reliably dismiss the on-screen keyboard inside
@@ -47,7 +62,10 @@ export function Header({
   const touchDismissHandlerRef = useRef<(() => void) | null>(null);
 
   const handleSearchFocus = () => {
-    onSearchFocus?.();
+    if (!onCatalog) {
+      haptic('light');
+      navigate('/catalog');
+    }
     const handler = () => dismissKeyboard();
     touchDismissHandlerRef.current = handler;
     window.addEventListener('touchmove', handler, { passive: true });
@@ -70,7 +88,7 @@ export function Header({
   return (
     <header className="app-header-wrap">
       <div className="app-header">
-        <button type="button" className="app-header__brand" onClick={onHomeClick} aria-label="На головну">
+        <button type="button" className="app-header__brand" onClick={() => { haptic('light'); navigate('/'); }} aria-label="На головну">
           <span className="app-header__logo">A</span>
         </button>
         {showSearch && (
@@ -79,7 +97,7 @@ export function Header({
             <input
               ref={searchInputRef}
               value={searchValue}
-              onChange={(event) => onSearchChange(event.target.value)}
+              onChange={(event) => handleSearchChange(event.target.value)}
               onFocus={handleSearchFocus}
               onBlur={handleSearchBlur}
               onKeyDown={(event) => {
@@ -89,7 +107,7 @@ export function Header({
               placeholder="Пошук товарів..."
             />
             {searchValue && (
-              <button type="button" aria-label="Очистити пошук" onClick={() => onSearchChange('')}>
+              <button type="button" aria-label="Очистити пошук" onClick={() => handleSearchChange('')}>
                 <X size={16} strokeWidth={2} />
               </button>
             )}

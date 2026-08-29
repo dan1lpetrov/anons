@@ -3,9 +3,16 @@
     { "source": "/admin", "destination": "/admin.html" },
     { "source": "/admin/upload", "destination": "/admin-upload.html" },
     { "source": "/admin/weights", "destination": "/admin-weights.html" },
-    { "source": "/admin/banners", "destination": "/admin-banners.html" }
+    { "source": "/admin/banners", "destination": "/admin-banners.html" },
+    { "source": "/product/:id", "destination": "/api/ssr-product?id=:id" },
+    { "source": "/catalog/:categoryId", "destination": "/api/ssr-catalog?categoryId=:categoryId" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ],
   "crons": [
     { "path": "/api/cron/recompute-scores", "schedule": "0 3 * * *" }
-  ]
+  ],
+  "functions": {
+    "api/ssr-product.ts": { "includeFiles": "dist/index.html" },
+    "api/ssr-catalog.ts": { "includeFiles": "dist/index.html" }
+  }
 }

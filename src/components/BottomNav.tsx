@@ -1,34 +1,36 @@
 import { Home, LayoutGrid, ShoppingCart } from 'lucide-react';
-import type { Screen } from '../types';
+import { NavLink } from 'react-router-dom';
+import { useTelegramContext } from '../hooks/useTelegram';
 
 interface BottomNavProps {
-  active: Screen;
   cartCount: number;
-  onNavigate: (screen: Screen) => void;
 }
 
-const TABS: Array<{ screen: Screen; label: string; icon: typeof Home }> = [
-  { screen: 'home', label: 'Головна', icon: Home },
-  { screen: 'catalog', label: 'Каталог', icon: LayoutGrid },
-  { screen: 'cart', label: 'Кошик', icon: ShoppingCart },
+const TABS = [
+  { to: '/', end: true, label: 'Головна', icon: Home },
+  { to: '/catalog', end: false, label: 'Каталог', icon: LayoutGrid },
+  { to: '/cart', end: true, label: 'Кошик', icon: ShoppingCart },
 ];
 
-export function BottomNav({ active, cartCount, onNavigate }: BottomNavProps) {
+export function BottomNav({ cartCount }: BottomNavProps) {
+  const { haptic } = useTelegramContext();
+
   return (
     <nav className="bottom-nav" aria-label="Основна навігація">
-      {TABS.map(({ screen, label, icon: Icon }) => (
-        <button
-          key={screen}
-          type="button"
-          className={`bottom-nav__tab ${active === screen ? 'active' : ''}`}
-          onClick={() => onNavigate(screen)}
+      {TABS.map(({ to, end, label, icon: Icon }) => (
+        <NavLink
+          key={to}
+          to={to}
+          end={end}
+          onClick={() => haptic('light')}
+          className={({ isActive }) => `bottom-nav__tab ${isActive ? 'active' : ''}`}
         >
           <span className="bottom-nav__icon-wrap">
             <Icon size={22} strokeWidth={2} />
-            {screen === 'cart' && cartCount > 0 && <span className="bottom-nav__badge">{cartCount}</span>}
+            {to === '/cart' && cartCount > 0 && <span className="bottom-nav__badge">{cartCount}</span>}
           </span>
           {label}
-        </button>
+        </NavLink>
       ))}
     </nav>
   );

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { createContext, useContext, useEffect, useMemo } from 'react';
 
 export function useTelegram() {
   const tg = useMemo(() => window.Telegram?.WebApp, []);
@@ -63,4 +63,15 @@ export function useTelegram() {
     showAlert,
     close: () => tg?.close(),
   };
+}
+
+// A handful of nav-triggering components (BottomNav, Header, CategoryFilter)
+// live outside App.tsx's own useTelegram() call — this lets them fire the same
+// tap haptic without each mounting a second, independent Telegram SDK binding.
+export const TelegramContext = createContext<ReturnType<typeof useTelegram> | null>(null);
+
+export function useTelegramContext() {
+  const ctx = useContext(TelegramContext);
+  if (!ctx) throw new Error('useTelegramContext must be used within <TelegramContext.Provider>');
+  return ctx;
 }

@@ -1,49 +1,74 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { SearchX } from 'lucide-react';
+import {
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useMatch,
+  useNavigate,
+  useNavigationType,
+  useParams,
+} from 'react-router-dom';
 import { BottomNav } from './components/BottomNav';
 import { CartView } from './components/CartView';
-import { CategoryFilter } from './components/CategoryFilter';
-import { CatalogControls } from './components/CatalogControls';
+import { CatalogRoute } from './components/CatalogRoute';
 import { Header } from './components/Header';
 import { Home } from './components/Home';
 import { OrderSuccess } from './components/OrderSuccess';
-import { Pagination } from './components/Pagination';
-import { ProductCard, type ProductDebugStats } from './components/ProductCard';
 import { ProductDetail } from './components/ProductDetail';
 import { products as seedProducts } from './data/products';
-import { sales } from './data/sales';
 import { useCart } from './hooks/useCart';
-import { useTelegram } from './hooks/useTelegram';
-import type { Banner, CatalogFilters, CategoryId, Order, Product, Screen, SortOption } from './types';
-import { filterAndSortProducts, getAvailableCategories, getAvailableSizes } from './utils/catalog';
+import { TelegramContext, useTelegram } from './hooks/useTelegram';
+import type { Banner, Order, Product } from './types';
+import { getAvailableCategories } from './utils/catalog';
 import { logProductEvent, logProductEvents } from './utils/events';
-import {
-  createOrderId,
-  saveOrderToLocalStorage,
-} from './utils/orderExport';
+import { createOrderId, getOrderFromLocalStorage, saveOrderToLocalStorage } from './utils/orderExport';
+import { getScrollContainer } from './utils/scroll';
 
-const PAGE_SIZE = 24;
+interface ProductRouteProps {
+  products: Product[];
+  onAddToCart: (product: Product, size: string, colorId: string, quantity: number) => void;
+  onBack: () => void;
+  onShare: (product: Product) => void;
+}
 
-// #root (not window) is the actual scroll container: `overflow-x: hidden` on html/body/#root
-// forces overflow-y's computed value to `auto` per spec, so #root scrolls internally at 100% height.
-function getScrollContainer(): Element {
-  return document.getElementById('root') ?? document.documentElement;
+function ProductRoute({ products, onAddToCart, onBack, onShare }: ProductRouteProps) {
+  const { id } = useParams<{ id: string }>();
+  const product = products.find((p) => p.id === id);
+  if (!product) return <Navigate to="/" replace />;
+  return (
+    <ProductDetail
+      product={product}
+      onAddToCart={(size, colorId, quantity) => onAddToCart(product, size, colorId, quantity)}
+      onBack={onBack}
+      onShare={() => onShare(product)}
+    />
+  );
+}
+
+function OrderRoute({ onContinue }: { onContinue: () => void }) {
+  const { orderId } = useParams<{ orderId: string }>();
+  const order = orderId ? getOrderFromLocalStorage(orderId) : undefined;
+  if (!order) return <Navigate to="/" replace />;
+  return <OrderSuccess order={order} onContinue={onContinue} />;
 }
 
 export default function App() {
-  const { tg, user, haptic, showAlert } = useTelegram();
+  const telegram = useTelegram();
+  const { tg, user, haptic, showAlert } = telegram;
   const [products, setProducts] = useState<Product[]>(seedProducts);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [banners, setBanners] = useState<Banner[]>([]);
   const cart = useCart(products);
 
-  const [screen, setScreen] = useState<Screen>('home');
-  const [category, setCategory] = useState<CategoryId | 'all'>('all');
-  const [filters, setFilters] = useState<CatalogFilters>({ search: '', sizes: [], brands: [] });
-  const [sort, setSort] = useState<SortOption>('recommended');
-  const [page, setPage] = useState(1);
-  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
-  const [lastOrder, setLastOrder] = useState<Order | null>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const navigationType = useNavigationType();
+  const productMatch = useMatch('/product/:id');
+  const selectedProduct = useMemo(
+    () => products.find((p) => p.id === productMatch?.params.id),
+    [products, productMatch],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -70,105 +95,45 @@ export default function App() {
     return () => { cancelled = true; };
   }, []);
 
-  const selectedProduct = useMemo(
-    () => products.find((p) => p.id === selectedProductId),
-    [products, selectedProductId],
-  );
-
-  const catalogContext = useMemo(
-    () => category === 'all' ? { mode: 'all' as const } : { mode: 'category' as const, categoryId: category },
-    [category],
-  );
-  const filteredProducts = useMemo(
-    () => filterAndSortProducts(products, catalogContext, filters, sort),
-    [products, catalogContext, filters, sort],
-  );
-  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const pagedProducts = useMemo(
-    () => filteredProducts.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
-    [filteredProducts, currentPage],
-  );
-
-  // Admin-only ranking diagnostics for the catalog grid (see CLAUDE.md "Product ranking score").
-  // /api/debug/product-score 401s for non-admins, so debugStats just stays empty for regular visitors.
-  const [debugStats, setDebugStats] = useState<Record<string, ProductDebugStats>>({});
-  useEffect(() => {
-    if (pagedProducts.length === 0) return;
-    let cancelled = false;
-    const ids = pagedProducts.map((p) => p.id).join(',');
-    fetch(`/api/debug/product-score?productIds=${encodeURIComponent(ids)}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: Record<string, ProductDebugStats> | null) => {
-        if (!cancelled && data) setDebugStats(data);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [pagedProducts]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [catalogContext, filters, sort]);
-
-  const isFirstPageRender = useRef(true);
-  useEffect(() => {
-    if (isFirstPageRender.current) {
-      isFirstPageRender.current = false;
-      return;
-    }
-    getScrollContainer().scrollTo({ top: 0, behavior: 'smooth' });
-  }, [currentPage]);
-
-  const changePage = (nextPage: number) => setPage(nextPage);
-
-  const selectableProducts = useMemo(
-    () => category === 'all' ? products : products.filter((product) => product.categoryId === category),
-    [products, category],
-  );
   const availableCategories = useMemo(() => getAvailableCategories(products), [products]);
-  const resetFilters = () => {
-    setFilters({ search: '', sizes: [], brands: [] });
-    setSort('recommended');
-  };
 
-  const scrollPositions = useRef<Partial<Record<Screen, number>>>({});
-
-  const navigate = useCallback((next: Screen, productId?: string | null) => {
-    scrollPositions.current[screen] = getScrollContainer().scrollTop;
-    haptic('light');
-    setScreen(next);
-    if (productId !== undefined) setSelectedProductId(productId);
-    window.history.pushState({ screen: next, productId: productId ?? selectedProductId }, '');
-    requestAnimationFrame(() => getScrollContainer().scrollTo({ top: 0, behavior: 'auto' }));
-  }, [haptic, selectedProductId, screen]);
-
-  const goBack = useCallback(() => {
-    window.history.back();
-  }, []);
-
+  // Scroll restoration for #root (the real scroll container — see utils/scroll.ts).
+  // Continuously records the offset for whichever path is current, so whenever a
+  // navigation away happens (from any component — Link, NavLink, a swipe gesture,
+  // the browser's own back/forward), the last-recorded value for the page being
+  // left is already up to date. Query-only changes (typing search, toggling a
+  // filter) keep the same pathname and are intentionally ignored here — only a
+  // real page change should move the scroll position.
+  const scrollPositions = useRef<Record<string, number>>({});
   useEffect(() => {
-    window.history.replaceState({ screen: 'home', productId: null }, '');
-
-    const handlePopState = (event: PopStateEvent) => {
-      const state = event.state as { screen: Screen; productId: string | null } | null;
-      const targetScreen = state?.screen ?? 'home';
-      setScreen(targetScreen);
-      setSelectedProductId(state?.productId ?? null);
-      const savedY = scrollPositions.current[targetScreen] ?? 0;
-      requestAnimationFrame(() => getScrollContainer().scrollTo({ top: savedY, behavior: 'auto' }));
+    const container = getScrollContainer();
+    const handleScroll = () => {
+      scrollPositions.current[location.pathname] = container.scrollTop;
     };
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [location.pathname]);
 
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+  const prevPathnameRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (prevPathnameRef.current === location.pathname) return;
+    prevPathnameRef.current = location.pathname;
+    const target = navigationType === 'POP' ? (scrollPositions.current[location.pathname] ?? 0) : 0;
+    requestAnimationFrame(() => getScrollContainer().scrollTo({ top: target, behavior: 'auto' }));
+  }, [location.pathname, navigationType]);
+
+  const goBack = useCallback(() => navigate(-1), [navigate]);
+
+  const goTo = useCallback((path: string) => {
+    haptic('light');
+    navigate(path);
+  }, [haptic, navigate]);
 
   useEffect(() => {
     if (!tg) return;
 
     const handleMainButton = () => {
-      if (screen === 'product' && selectedProduct) {
+      if (selectedProduct) {
         const size = selectedProduct.sizes[0];
         const colorId = selectedProduct.colors[0]?.id;
         if (size && colorId) {
@@ -179,7 +144,7 @@ export default function App() {
       }
     };
 
-    if (screen === 'product' && selectedProduct) {
+    if (selectedProduct) {
       tg.MainButton.setText('Додати в кошик');
       tg.MainButton.show();
       tg.MainButton.enable();
@@ -191,12 +156,12 @@ export default function App() {
     return () => {
       tg.MainButton.offClick(handleMainButton);
     };
-  }, [tg, screen, selectedProduct, cart, navigate, haptic, showAlert]);
+  }, [tg, selectedProduct, cart, haptic, showAlert]);
 
   useEffect(() => {
     if (!tg) return;
 
-    const showBack = screen !== 'home' && screen !== 'success';
+    const showBack = location.pathname !== '/' && !location.pathname.startsWith('/order/');
     if (showBack) {
       tg.BackButton.show();
       tg.BackButton.onClick(goBack);
@@ -207,18 +172,36 @@ export default function App() {
     return () => {
       tg.BackButton.offClick(goBack);
     };
-  }, [tg, screen, goBack]);
+  }, [tg, location.pathname, goBack]);
 
   const openProduct = (id: string) => {
-    navigate('product', id);
+    goTo(`/product/${encodeURIComponent(id)}`);
     logProductEvent('view', id, user?.id);
   };
 
-  const handleAddToCart = (size: string, colorId: string, quantity: number) => {
-    if (!selectedProductId) return;
-    cart.addItem({ productId: selectedProductId, size, colorId, quantity });
+  const handleAddToCart = (product: Product, size: string, colorId: string, quantity: number) => {
+    cart.addItem({ productId: product.id, size, colorId, quantity });
     haptic('success');
     showAlert('Додано в кошик!');
+  };
+
+  const handleShareProduct = async (product: Product) => {
+    const url = `${window.location.origin}/product/${product.id}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: product.name, url });
+      } catch {
+        // user dismissed the share sheet — not an error
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      haptic('success');
+      showAlert('Посилання скопійовано!');
+    } catch {
+      showAlert(url);
+    }
   };
 
   const handleSubmitOrder = (comment: string) => {
@@ -244,116 +227,71 @@ export default function App() {
     );
 
     cart.clearCart();
-    setLastOrder(order);
     haptic('success');
-    navigate('success');
+    navigate(`/order/${order.id}`);
   };
 
-  const showBottomNav = screen === 'home' || screen === 'catalog' || screen === 'product' || screen === 'cart';
+  const showBottomNav = !location.pathname.startsWith('/order/');
 
   return (
-    <div className={`app ${showBottomNav ? 'app--with-nav' : ''}`}>
-      <Header
-        showSearch={screen === 'home' || screen === 'catalog' || screen === 'product'}
-        searchValue={filters.search}
-        onSearchChange={(search) => setFilters({ ...filters, search })}
-        onSearchFocus={() => {
-          if (screen === 'home' || screen === 'product') navigate('catalog');
-        }}
-        onHomeClick={() => navigate('home')}
-      />
+    <TelegramContext.Provider value={telegram}>
+      <div className={`app ${showBottomNav ? 'app--with-nav' : ''}`}>
+        <Header />
 
-      <main className="app-main">
-        {screen === 'home' && (
-          <Home
-            products={products}
-            categories={availableCategories}
-            banners={banners}
-            isLoading={isLoadingProducts}
-            onOpenProduct={openProduct}
-            onViewCategory={(categoryId) => {
-              setCategory(categoryId);
-              navigate('catalog');
-            }}
-            onViewAll={() => {
-              setCategory('all');
-              navigate('catalog');
-            }}
-          />
-        )}
+        <main className="app-main">
+          <Routes>
+            <Route
+              path="/"
+              element={
+                <Home
+                  products={products}
+                  categories={availableCategories}
+                  banners={banners}
+                  isLoading={isLoadingProducts}
+                  onOpenProduct={openProduct}
+                  onViewCategory={(categoryId) => goTo(`/catalog/${encodeURIComponent(categoryId)}`)}
+                  onViewAll={() => goTo('/catalog')}
+                />
+              }
+            />
+            <Route
+              path="/catalog"
+              element={<CatalogRoute products={products} isLoadingProducts={isLoadingProducts} onOpenProduct={openProduct} />}
+            />
+            <Route
+              path="/catalog/:categoryId"
+              element={<CatalogRoute products={products} isLoadingProducts={isLoadingProducts} onOpenProduct={openProduct} />}
+            />
+            <Route
+              path="/product/:id"
+              element={
+                <ProductRoute
+                  products={products}
+                  onAddToCart={handleAddToCart}
+                  onBack={goBack}
+                  onShare={handleShareProduct}
+                />
+              }
+            />
+            <Route
+              path="/cart"
+              element={
+                <CartView
+                  items={cart.enrichedItems}
+                  totalPrice={cart.totalPrice}
+                  onUpdateQuantity={cart.updateQuantity}
+                  onRemove={cart.removeItem}
+                  onCheckout={handleSubmitOrder}
+                />
+              }
+            />
+            <Route path="/order/:orderId" element={<OrderRoute onContinue={() => navigate('/')} />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </main>
 
-        {screen === 'catalog' && (
-          <>
-            <CategoryFilter active={category} categories={availableCategories} onChange={setCategory} />
-            <div className="catalog-layout">
-              <CatalogControls
-                filters={filters}
-                sort={sort}
-                sizes={getAvailableSizes(selectableProducts)}
-                brands={sales}
-                resultCount={filteredProducts.length}
-                onFiltersChange={setFilters}
-                onSortChange={setSort}
-                onReset={resetFilters}
-              >
-                {isLoadingProducts ? (
-                  <div className="product-grid">
-                    {Array.from({ length: 6 }).map((_, i) => (
-                      <div key={i} className="product-card product-card--skeleton">
-                        <div className="product-card__image-wrap skeleton-block" />
-                        <div className="product-card__body">
-                          <div className="skeleton-block skeleton-line skeleton-line--short" />
-                          <div className="skeleton-block skeleton-line" />
-                          <div className="skeleton-block skeleton-line skeleton-line--short" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : filteredProducts.length ? (
-                  <>
-                    <div className="product-grid">
-                      {pagedProducts.map((product) => (
-                        <ProductCard
-                          key={product.id}
-                          product={product}
-                          onClick={() => openProduct(product.id)}
-                          debug={debugStats[product.id]}
-                        />
-                      ))}
-                    </div>
-                    <Pagination page={currentPage} totalPages={totalPages} onChange={changePage} />
-                  </>
-                ) : (
-                  <div className="empty-state"><SearchX className="empty-state__icon" size={40} strokeWidth={1.5} aria-hidden="true" /><h2>Нічого не знайдено</h2><p>Спробуйте змінити параметри пошуку або фільтри.</p></div>
-                )}
-              </CatalogControls>
-            </div>
-          </>
-        )}
-
-        {screen === 'product' && selectedProduct && (
-          <ProductDetail product={selectedProduct} onAddToCart={handleAddToCart} onBack={goBack} />
-        )}
-
-        {screen === 'cart' && (
-          <CartView
-            items={cart.enrichedItems}
-            totalPrice={cart.totalPrice}
-            onUpdateQuantity={cart.updateQuantity}
-            onRemove={cart.removeItem}
-            onCheckout={handleSubmitOrder}
-          />
-        )}
-
-        {screen === 'success' && lastOrder && (
-          <OrderSuccess
-            order={lastOrder}
-            onContinue={() => navigate('home')}
-          />
-        )}
-      </main>
-
-      {showBottomNav && <BottomNav active={screen} cartCount={cart.totalItems} onNavigate={navigate} />}
-    </div>
+        {showBottomNav && <BottomNav cartCount={cart.totalItems} />}
+      </div>
+    </TelegramContext.Provider>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Share2 } from 'lucide-react';
 import type { Product } from '../types';
 import { colorOriginalPrice, colorPrice, discountPercent, formatPrice } from '../utils/format';
 import { splitTallSizes } from '../utils/sizes';
@@ -15,9 +15,10 @@ interface ProductDetailProps {
   product: Product;
   onAddToCart: (size: string, colorId: string, quantity: number) => void;
   onBack: () => void;
+  onShare: () => void;
 }
 
-export function ProductDetail({ product, onAddToCart, onBack }: ProductDetailProps) {
+export function ProductDetail({ product, onAddToCart, onBack, onShare }: ProductDetailProps) {
   const [colorId, setColorId] = useState(product.colors[0]?.id ?? '');
   const selectedColor = product.colors.find((c) => c.id === colorId) ?? product.colors[0];
   const { regular: regularSizes, tall: tallSizes } = splitTallSizes(selectedColor?.sizes ?? []);
@@ -195,7 +196,12 @@ export function ProductDetail({ product, onAddToCart, onBack }: ProductDetailPro
       </div>
 
       <div className="product-detail__content">
-        <p className="product-detail__source">{product.sourceName}</p>
+        <div className="product-detail__meta-row">
+          <p className="product-detail__source">{product.sourceName}</p>
+          <button type="button" className="product-detail__share" onClick={onShare} aria-label="Поділитись товаром">
+            <Share2 size={18} strokeWidth={2} />
+          </button>
+        </div>
         <h1 className="product-detail__title">
           <a href={product.productUrl} target="_blank" rel="noopener noreferrer">
             {product.name}

@@ -526,10 +526,30 @@ img {
   padding: 16px;
 }
 
+.product-detail__meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .product-detail__source {
   font-size: 13px;
   color: var(--tg-hint);
   margin-bottom: 4px;
+}
+
+.product-detail__share {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--tg-bg);
+  color: var(--tg-text);
 }
 
 .product-detail__title {

@@ -52,11 +52,20 @@ export function formatOrderText(order: Order): string {
   return lines.join('\n');
 }
 
+const ORDERS_KEY = 'anons-orders';
+
 export function saveOrderToLocalStorage(order: Order): void {
-  const key = 'anons-orders';
-  const existing = JSON.parse(localStorage.getItem(key) ?? '[]') as Order[];
+  const existing = JSON.parse(localStorage.getItem(ORDERS_KEY) ?? '[]') as Order[];
   existing.push(order);
-  localStorage.setItem(key, JSON.stringify(existing));
+  localStorage.setItem(ORDERS_KEY, JSON.stringify(existing));
+}
+
+// Backs the /order/:orderId route: order confirmation has no server-side
+// record (checkout doesn't process anything, see CLAUDE.md), so the only
+// way to survive a refresh on that URL is looking the order back up here.
+export function getOrderFromLocalStorage(orderId: string): Order | undefined {
+  const existing = JSON.parse(localStorage.getItem(ORDERS_KEY) ?? '[]') as Order[];
+  return existing.find((order) => order.id === orderId);
 }
 
 export function createOrderId(): string {

@@ -69,8 +69,6 @@ export interface Order {
   telegramUser?: TelegramWebAppUser;
 }
 
-export type Screen = 'home' | 'catalog' | 'product' | 'cart' | 'success';
-
 export type CatalogContext =
   | { mode: 'all' }
   | { mode: 'category'; categoryId: CategoryId }

@@ -14,7 +14,8 @@
     "jose": "^6.2.10",
     "lucide-react": "^1.35.0",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "react-router-dom": "^7.18.3"
   },
   "devDependencies": {
     "@types/node": "^24.13.2",

@@ -74,11 +74,13 @@ export async function ensureSchema(): Promise<void> {
             title TEXT NOT NULL DEFAULT '',
             subtitle TEXT NOT NULL DEFAULT '',
             link_category_id TEXT,
+            link_sale_id TEXT,
             sort_order INTEGER NOT NULL DEFAULT 0,
             active BOOLEAN NOT NULL DEFAULT true,
             updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
           );
         `);
+        await client.query(`ALTER TABLE banners ADD COLUMN IF NOT EXISTS link_sale_id TEXT;`);
         await client.query(`
           CREATE TABLE IF NOT EXISTS score_weights (
             id INTEGER PRIMARY KEY DEFAULT 1,

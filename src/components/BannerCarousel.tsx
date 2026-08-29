@@ -3,7 +3,7 @@ import type { Banner } from '../types';
 
 interface BannerCarouselProps {
   banners: Banner[];
-  onSelect: (linkCategoryId: string | null) => void;
+  onSelect: (banner: Banner) => void;
 }
 
 const AUTO_ADVANCE_MS = 4500;
@@ -41,7 +41,7 @@ export function BannerCarousel({ banners, onSelect }: BannerCarouselProps) {
             key={banner.id}
             type="button"
             className="home-banner__slide"
-            onClick={() => onSelect(banner.linkCategoryId)}
+            onClick={() => onSelect(banner)}
           >
             <img src={banner.imageUrl} alt={banner.title} />
             {(banner.title || banner.subtitle) && (

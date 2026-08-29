@@ -266,6 +266,7 @@ export default function App() {
                   isLoading={isLoadingProducts}
                   onOpenProduct={openProduct}
                   onViewCategory={(categoryId) => goTo(`/catalog/${encodeURIComponent(categoryId)}`)}
+                  onViewSale={(saleId) => goTo(`/catalog?brands=${encodeURIComponent(saleId)}`)}
                   onViewAll={() => goTo('/catalog')}
                 />
               }

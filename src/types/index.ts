@@ -88,6 +88,7 @@ export interface Banner {
   title: string;
   subtitle: string;
   linkCategoryId: string | null;
+  linkSaleId: string | null;
   sortOrder: number;
   active: boolean;
 }

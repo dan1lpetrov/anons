@@ -99,7 +99,8 @@ textarea:focus { border-color: var(--accent); }
 
 input[type="text"],
 input[type="date"],
-input[type="number"] {
+input[type="number"],
+select {
   font: inherit;
   padding: 8px 10px;
   border-radius: var(--radius-sm);

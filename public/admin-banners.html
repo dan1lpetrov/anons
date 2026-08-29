@@ -25,6 +25,11 @@
   .banner-row__actions { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
   .checkbox-field { display: flex; align-items: center; gap: 8px; }
   .checkbox-field label { text-transform: none; font-size: 14px; font-weight: 400; color: var(--text); margin: 0; }
+  .banner-image-picker { display: flex; align-items: flex-start; gap: 12px; }
+  .banner-image-picker__preview { width: 96px; height: 96px; border-radius: var(--radius-sm); object-fit: cover; background: var(--bg); border: 1px solid var(--border); flex-shrink: 0; }
+  .banner-image-picker__controls { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  .link-type-group { display: flex; gap: 16px; }
+  .link-type-group label { display: flex; align-items: center; gap: 6px; text-transform: none; font-size: 14px; font-weight: 400; color: var(--text); margin: 0; }
 </style>
 </head>
 <body>
@@ -43,15 +48,22 @@
     <div class="admin-content__inner">
       <div>
         <h1>Банери на головній</h1>
-        <p class="hint">Керує каруселлю банерів на головному екрані сторефронту. Посилання на категорію — необов'язкове: id категорії такий самий, як categoryId у товарах (наприклад <code>shoes</code>, <code>clothing</code>).</p>
+        <p class="hint">Керує каруселлю банерів на головному екрані сторефронту. Банер може вести на категорію (id такий самий, як categoryId у товарах, наприклад <code>shoes</code>, <code>clothing</code>) або на активний розпродаж — або нікуди.</p>
       </div>
 
       <section id="addSection">
         <h2 id="formTitle">Додати банер</h2>
         <div class="banner-form-grid">
           <div class="full">
-            <label for="newImageUrl">URL картинки</label>
-            <input id="newImageUrl" type="text" placeholder="https://..." />
+            <label for="imageFile">Картинка банера</label>
+            <div class="banner-image-picker">
+              <img id="imagePreview" class="banner-image-picker__preview hidden" alt="" />
+              <div class="banner-image-picker__controls">
+                <input id="imageFile" type="file" accept="image/*" />
+                <input id="newImageUrl" type="text" placeholder="https://... (або завантаж файл вище)" />
+              </div>
+            </div>
+            <div id="uploadStatus" class="status"></div>
           </div>
           <div>
             <label for="newTitle">Заголовок</label>
@@ -61,9 +73,21 @@
             <label for="newSubtitle">Підзаголовок</label>
             <input id="newSubtitle" type="text" placeholder="Дивитись" />
           </div>
-          <div>
-            <label for="newCategory">Категорія (необов'язково)</label>
+          <div class="full">
+            <label>Куди веде банер</label>
+            <div class="link-type-group">
+              <label><input type="radio" name="linkType" value="none" checked /> Немає</label>
+              <label><input type="radio" name="linkType" value="category" /> Категорія</label>
+              <label><input type="radio" name="linkType" value="sale" /> Розпродаж</label>
+            </div>
+          </div>
+          <div class="full hidden" id="categoryField">
+            <label for="newCategory">Категорія</label>
             <input id="newCategory" type="text" placeholder="shoes" />
+          </div>
+          <div class="full hidden" id="saleField">
+            <label for="newSale">Розпродаж</label>
+            <select id="newSale"></select>
           </div>
           <div>
             <label for="newOrder">Порядок</label>
@@ -106,20 +130,124 @@
   const cancelEditBtn = document.getElementById('cancelEdit');
   const formTitle = document.getElementById('formTitle');
 
+  const imageFile = document.getElementById('imageFile');
+  const imagePreview = document.getElementById('imagePreview');
+  const uploadStatus = document.getElementById('uploadStatus');
+  const linkTypeRadios = document.querySelectorAll('input[name="linkType"]');
+  const categoryField = document.getElementById('categoryField');
+  const saleField = document.getElementById('saleField');
+  const newSale = document.getElementById('newSale');
+
   const bannersList = document.getElementById('bannersList');
   const listStatus = document.getElementById('listStatus');
   const reloadBtn = document.getElementById('reloadBanners');
+
+  // Mirrors the SaleId brand enum from src/types — see admin-upload.html's SALES map.
+  const SALES = {
+    nike: { name: 'Nike' },
+    adidas: { name: 'Adidas' },
+    puma: { name: 'Puma' },
+  };
+  let activeSales = [];
+
+  async function loadSalesOptions() {
+    try {
+      const res = await fetch('/api/sales', { cache: 'no-store', credentials: 'include' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const all = await res.json();
+      activeSales = all.filter((s) => s.active);
+    } catch (err) {
+      activeSales = [];
+    }
+    newSale.innerHTML = '';
+    if (activeSales.length === 0) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = 'Немає активних розпродажів';
+      newSale.appendChild(opt);
+      return;
+    }
+    activeSales.forEach((s) => {
+      const opt = document.createElement('option');
+      opt.value = s.saleId;
+      opt.textContent = (SALES[s.saleId] && SALES[s.saleId].name) || s.saleId;
+      newSale.appendChild(opt);
+    });
+  }
+
+  function getLinkType() {
+    return document.querySelector('input[name="linkType"]:checked').value;
+  }
+
+  function setLinkType(type) {
+    document.querySelector(`input[name="linkType"][value="${type}"]`).checked = true;
+    updateLinkFieldVisibility();
+  }
+
+  function updateLinkFieldVisibility() {
+    const type = getLinkType();
+    categoryField.classList.toggle('hidden', type !== 'category');
+    saleField.classList.toggle('hidden', type !== 'sale');
+  }
+
+  linkTypeRadios.forEach((radio) => radio.addEventListener('change', updateLinkFieldVisibility));
+
+  function updateImagePreview() {
+    const url = addImageUrl.value.trim();
+    if (url) {
+      imagePreview.src = url;
+      imagePreview.classList.remove('hidden');
+    } else {
+      imagePreview.classList.add('hidden');
+    }
+  }
+
+  addImageUrl.addEventListener('input', updateImagePreview);
+
+  imageFile.addEventListener('change', async () => {
+    const file = imageFile.files && imageFile.files[0];
+    if (!file) return;
+    AdminShared.setStatus(uploadStatus, 'pending', 'Завантаження зображення...');
+    try {
+      const res = await fetch(`/api/banners?upload=1&filename=${encodeURIComponent(file.name)}`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': file.type || 'application/octet-stream' },
+        body: file,
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      addImageUrl.value = body.url;
+      updateImagePreview();
+      AdminShared.setStatus(uploadStatus, 'ok', 'Зображення завантажено.');
+    } catch (err) {
+      AdminShared.setStatus(uploadStatus, 'err', 'Помилка: ' + err.message);
+    } finally {
+      imageFile.value = '';
+    }
+  });
 
   let editingId = null;
 
   function startEdit(banner) {
     editingId = banner.id;
     addImageUrl.value = banner.imageUrl || '';
+    updateImagePreview();
     addTitle.value = banner.title || '';
     addSubtitle.value = banner.subtitle || '';
-    addCategory.value = banner.linkCategoryId || '';
     addOrder.value = String(banner.sortOrder ?? 0);
     addActive.checked = !!banner.active;
+    if (banner.linkSaleId) {
+      setLinkType('sale');
+      addCategory.value = '';
+      newSale.value = banner.linkSaleId;
+    } else if (banner.linkCategoryId) {
+      setLinkType('category');
+      addCategory.value = banner.linkCategoryId;
+    } else {
+      setLinkType('none');
+      addCategory.value = '';
+    }
     formTitle.textContent = 'Редагувати банер';
     addBtn.textContent = 'Зберегти зміни';
     cancelEditBtn.classList.remove('hidden');
@@ -131,9 +259,11 @@
   function stopEdit() {
     editingId = null;
     addImageUrl.value = '';
+    updateImagePreview();
     addTitle.value = '';
     addSubtitle.value = '';
     addCategory.value = '';
+    setLinkType('none');
     addOrder.value = '0';
     addActive.checked = true;
     formTitle.textContent = 'Додати банер';
@@ -180,7 +310,8 @@
       title.textContent = banner.title || '(без заголовка)';
       const meta = document.createElement('div');
       meta.className = 'banner-row__meta';
-      meta.textContent = `#${banner.sortOrder} · ${banner.active ? 'Активний' : 'Вимкнений'}${banner.linkCategoryId ? ' · → ' + banner.linkCategoryId : ''}`;
+      const saleLabel = banner.linkSaleId ? (SALES[banner.linkSaleId] && SALES[banner.linkSaleId].name) || banner.linkSaleId : '';
+      meta.textContent = `#${banner.sortOrder} · ${banner.active ? 'Активний' : 'Вимкнений'}${banner.linkCategoryId ? ' · категорія → ' + banner.linkCategoryId : ''}${saleLabel ? ' · розпродаж → ' + saleLabel : ''}`;
       body.append(title, meta);
 
       const actions = document.createElement('div');
@@ -251,6 +382,11 @@
       return;
     }
     const isEdit = editingId !== null;
+    const linkType = getLinkType();
+    if (linkType === 'sale' && !newSale.value) {
+      AdminShared.setStatus(addStatus, 'err', 'Оберіть активний розпродаж.');
+      return;
+    }
     addBtn.disabled = true;
     try {
       AdminShared.setStatus(addStatus, 'pending', isEdit ? 'Збереження...' : 'Додавання...');
@@ -259,7 +395,8 @@
         imageUrl: addImageUrl.value.trim(),
         title: addTitle.value.trim(),
         subtitle: addSubtitle.value.trim(),
-        linkCategoryId: addCategory.value.trim() || null,
+        linkCategoryId: linkType === 'category' ? addCategory.value.trim() || null : null,
+        linkSaleId: linkType === 'sale' ? newSale.value : null,
         sortOrder: Number(addOrder.value) || 0,
         active: addActive.checked,
       });
@@ -281,7 +418,11 @@
   reloadBtn.addEventListener('click', loadBanners);
 
   AdminShared.init('banners').then((email) => {
-    if (email) loadBanners();
+    if (email) {
+      // Loaded together so the sale <select> already has its options by the
+      // time a banner row's "Редагувати" button becomes clickable.
+      Promise.all([loadBanners(), loadSalesOptions()]);
+    }
   });
 </script>
 </body>

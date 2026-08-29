@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Product } from '../types';
 import { colorOriginalPrice, colorPrice, discountPercent, formatPrice } from '../utils/format';
 import { splitTallSizes } from '../utils/sizes';
@@ -141,7 +142,7 @@ export function ProductDetail({ product, onAddToCart, onBack }: ProductDetailPro
                 onClick={() => goToImage(-1)}
                 aria-label="Попереднє фото"
               >
-                ‹
+                <ChevronLeft size={20} strokeWidth={2} />
               </button>
               <button
                 type="button"
@@ -149,7 +150,7 @@ export function ProductDetail({ product, onAddToCart, onBack }: ProductDetailPro
                 onClick={() => goToImage(1)}
                 aria-label="Наступне фото"
               >
-                ›
+                <ChevronRight size={20} strokeWidth={2} />
               </button>
               <div className="product-detail__dots">
                 {images.map((img, index) => (

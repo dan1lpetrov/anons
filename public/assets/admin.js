@@ -1,9 +1,80 @@
 window.AdminShared = (function () {
   const PAGES = [
-    { key: 'sales', href: '/admin', label: 'Розпродажі' },
-    { key: 'upload', href: '/admin/upload', label: 'Додати розпродаж' },
-    { key: 'weights', href: '/admin/weights', label: 'Ваги ранжування' },
+    { key: 'sales', href: '/admin', label: 'Розпродажі', icon: 'tag' },
+    { key: 'upload', href: '/admin/upload', label: 'Додати розпродаж', icon: 'upload' },
+    { key: 'weights', href: '/admin/weights', label: 'Ваги ранжування', icon: 'sliders' },
   ];
+
+  const ICONS = {
+    tag: '<path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/>',
+    upload: '<path d="M12 3v12"/><path d="m17 8-5-5-5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>',
+    sliders: '<line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/>',
+    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+    moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+    monitor: '<rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/>',
+    logOut: '<path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>',
+    inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+  };
+
+  function icon(name, size) {
+    size = size || 16;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ''}</svg>`;
+  }
+
+  const THEME_KEY = 'anons-admin-theme';
+
+  function applyTheme(mode) {
+    if (mode === 'light' || mode === 'dark') {
+      document.documentElement.setAttribute('data-theme', mode);
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
+  }
+
+  function getStoredTheme() {
+    try {
+      return localStorage.getItem(THEME_KEY) || 'system';
+    } catch {
+      return 'system';
+    }
+  }
+
+  function setStoredTheme(mode) {
+    try {
+      localStorage.setItem(THEME_KEY, mode);
+    } catch {
+      // ignore (private mode / storage disabled)
+    }
+    applyTheme(mode);
+  }
+
+  // Runs immediately on script load (before nav renders) so the page never flashes
+  // the wrong theme — admin.html's inline boot script also does this pre-paint.
+  applyTheme(getStoredTheme());
+
+  function renderThemeToggle() {
+    const wrap = document.createElement('div');
+    wrap.className = 'admin-nav__theme';
+    const current = getStoredTheme();
+    [
+      ['light', 'sun'],
+      ['system', 'monitor'],
+      ['dark', 'moon'],
+    ].forEach(([mode, iconName]) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = mode === current ? 'active' : '';
+      btn.innerHTML = icon(iconName, 14);
+      btn.setAttribute('aria-label', mode);
+      btn.addEventListener('click', () => {
+        setStoredTheme(mode);
+        wrap.querySelectorAll('button').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+      wrap.appendChild(btn);
+    });
+    return wrap;
+  }
 
   function setStatus(el, kind, text) {
     el.className = 'status ' + kind;
@@ -23,13 +94,15 @@ window.AdminShared = (function () {
       const a = document.createElement('a');
       a.href = page.href;
       a.className = 'admin-nav__link' + (page.key === activeKey ? ' active' : '');
-      a.textContent = page.label;
+      a.innerHTML = icon(page.icon) + `<span>${page.label}</span>`;
       nav.appendChild(a);
     });
 
     const spacer = document.createElement('div');
     spacer.className = 'admin-nav__spacer';
     nav.appendChild(spacer);
+
+    nav.appendChild(renderThemeToggle());
 
     const account = document.createElement('div');
     account.className = 'admin-nav__account';
@@ -39,7 +112,7 @@ window.AdminShared = (function () {
     const logoutBtn = document.createElement('button');
     logoutBtn.type = 'button';
     logoutBtn.className = 'secondary';
-    logoutBtn.textContent = 'Вийти';
+    logoutBtn.innerHTML = icon('logOut', 14) + '<span>Вийти</span>';
     logoutBtn.addEventListener('click', async () => {
       await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
       location.href = '/admin';
@@ -71,5 +144,5 @@ window.AdminShared = (function () {
     }
   }
 
-  return { setStatus, init };
+  return { setStatus, init, icon };
 })();

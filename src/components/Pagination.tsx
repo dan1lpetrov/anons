@@ -1,3 +1,5 @@
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+
 interface PaginationProps {
   page: number;
   totalPages: number;
@@ -30,7 +32,7 @@ export function Pagination({ page, totalPages, onChange }: PaginationProps) {
         onClick={() => onChange(page - 1)}
         aria-label="Попередня сторінка"
       >
-        ‹
+        <ChevronLeft size={16} strokeWidth={2} />
       </button>
 
       {getPageList(page, totalPages).map((item, i) =>
@@ -56,7 +58,7 @@ export function Pagination({ page, totalPages, onChange }: PaginationProps) {
         onClick={() => onChange(page + 1)}
         aria-label="Наступна сторінка"
       >
-        ›
+        <ChevronRight size={16} strokeWidth={2} />
       </button>
     </nav>
   );

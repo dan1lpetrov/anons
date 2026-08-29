@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## UI / design
+
+Any UI work (colors, typography, spacing, components, layout) must follow **`DESIGN.md`** at the repo root — it defines two independent design systems: the Admin Panel (light/dark SaaS-dashboard look) and the Storefront (mobile-first Telegram mini app look), each with its own color tokens, type scale, and component rules. Read it before touching `src/index.css`, any file under `src/components/`, or `public/assets/admin.css`. If the user asks to change the design direction, update `DESIGN.md` itself so it stays the source of truth, not just the code.
+
 ## What this is
 
 A Telegram Mini App storefront ("Anons Shop") that lists clothing/shoes scraped from brand sale/outlet pages (Nike, Adidas, Puma — `saleId` in the data model), lets a user browse, add to cart, and "check out." Checkout does **not** process any payment — it produces a formatted order summary (`src/utils/orderExport.ts`) meant for the shop owner to manually re-purchase the items on the source site. There is no backend order fulfillment beyond saving the order to `localStorage` and rendering a summary screen.

@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react';
 import type { Order } from '../types';
 import { formatPrice } from '../utils/format';
 
@@ -9,7 +10,7 @@ interface OrderSuccessProps {
 export function OrderSuccess({ order, onContinue }: OrderSuccessProps) {
   return (
     <div className="success-view">
-      <div className="success-icon">✓</div>
+      <div className="success-icon"><Check size={36} strokeWidth={2.5} /></div>
       <h2>Замовлення оформлено!</h2>
       <p className="success-id">№ {order.id}</p>
 

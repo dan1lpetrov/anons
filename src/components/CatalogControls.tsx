@@ -1,4 +1,5 @@
 import { useState, type ChangeEvent, type ReactNode } from 'react';
+import { Search, SlidersHorizontal, X } from 'lucide-react';
 import type { CatalogFilters, Sale, SortOption } from '../types';
 import type { AvailableSizes } from '../utils/catalog';
 import { SizeChips } from './SizeChips';
@@ -13,9 +14,9 @@ export function CatalogSearch({ value, onChange }: SearchProps) {
 
   return (
     <label className="catalog-search">
-      <span aria-hidden="true">⌕</span>
+      <Search size={18} strokeWidth={2} aria-hidden="true" />
       <input value={value} onChange={updateSearch} type="search" placeholder="Пошук товарів..." />
-      {value && <button type="button" aria-label="Очистити пошук" onClick={() => onChange('')}>×</button>}
+      {value && <button type="button" aria-label="Очистити пошук" onClick={() => onChange('')}><X size={16} strokeWidth={2} /></button>}
     </label>
   );
 }
@@ -132,7 +133,7 @@ export function CatalogControls({ filters, sort, sizes, brands, resultCount, onF
         <div className="catalog-toolbar-wrap">
           <div className="catalog-toolbar">
             <button className="toolbar-button" type="button" onClick={() => setFiltersOpen(true)}>
-              <span aria-hidden="true">☷</span> Фільтри
+              <SlidersHorizontal size={16} strokeWidth={2} aria-hidden="true" /> Фільтри
               {activeCount > 0 && <b>{activeCount}</b>}
             </button>
             {sortSelect}
@@ -148,7 +149,7 @@ export function CatalogControls({ filters, sort, sizes, brands, resultCount, onF
                 <div className="sheet-handle" />
                 <header className="sheet-header">
                   <h2>Фільтри</h2>
-                  <button type="button" aria-label="Закрити" onClick={() => setFiltersOpen(false)}>×</button>
+                  <button type="button" aria-label="Закрити" onClick={() => setFiltersOpen(false)}><X size={20} strokeWidth={2} /></button>
                 </header>
 
                 <div className="sheet-content">{filterGroups}</div>

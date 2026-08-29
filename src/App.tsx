@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { SearchX } from 'lucide-react';
 import { CartView } from './components/CartView';
 import { CategoryFilter } from './components/CategoryFilter';
 import { CatalogControls } from './components/CatalogControls';
@@ -300,7 +301,7 @@ export default function App() {
                     <Pagination page={currentPage} totalPages={totalPages} onChange={changePage} />
                   </>
                 ) : (
-                  <div className="empty-state"><span className="empty-state__icon">🔎</span><h2>Нічого не знайдено</h2><p>Спробуйте змінити параметри пошуку або фільтри.</p></div>
+                  <div className="empty-state"><SearchX className="empty-state__icon" size={40} strokeWidth={1.5} aria-hidden="true" /><h2>Нічого не знайдено</h2><p>Спробуйте змінити параметри пошуку або фільтри.</p></div>
                 )}
               </CatalogControls>
             </div>

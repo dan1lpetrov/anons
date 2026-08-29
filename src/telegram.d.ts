@@ -52,6 +52,8 @@ interface TelegramWebApp {
   sendData: (data: string) => void;
   showAlert: (message: string, callback?: () => void) => void;
   showConfirm: (message: string, callback?: (confirmed: boolean) => void) => void;
+  onEvent: (eventType: string, callback: () => void) => void;
+  offEvent: (eventType: string, callback: () => void) => void;
 }
 
 interface Window {

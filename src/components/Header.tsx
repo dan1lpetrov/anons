@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Search, ShoppingCart, ChevronLeft, X } from 'lucide-react';
 
 interface HeaderProps {
   title: string;
@@ -26,23 +27,29 @@ export function Header({ title, cartCount, showCart, onCartClick, searchValue, o
       </button>
       {showCart && (
         <button type="button" className="header-search-button" onClick={() => setSearchOpen(true)} aria-label="Пошук">
-          ⌕
+          <Search size={20} strokeWidth={2} />
         </button>
       )}
       {showCart && (
         <button type="button" className="cart-button" onClick={onCartClick} aria-label="Кошик">
-          🛒
+          <ShoppingCart size={20} strokeWidth={2} />
           {cartCount > 0 && <span className="cart-button__badge">{cartCount}</span>}
         </button>
       )}
       {searchOpen && (
         <div className="header-search-overlay">
-          <button type="button" className="header-search-overlay__back" onClick={() => setSearchOpen(false)} aria-label="Закрити пошук">‹</button>
+          <button type="button" className="header-search-overlay__back" onClick={() => setSearchOpen(false)} aria-label="Закрити пошук">
+            <ChevronLeft size={24} strokeWidth={2} />
+          </button>
           <label>
-            <span aria-hidden="true">⌕</span>
+            <Search size={18} strokeWidth={2} aria-hidden="true" />
             <input ref={inputRef} value={searchValue} onChange={(event) => onSearchChange(event.target.value)} type="search" placeholder="Пошук товарів..." />
           </label>
-          {searchValue && <button type="button" className="header-search-overlay__clear" onClick={() => onSearchChange('')} aria-label="Очистити пошук">×</button>}
+          {searchValue && (
+            <button type="button" className="header-search-overlay__clear" onClick={() => onSearchChange('')} aria-label="Очистити пошук">
+              <X size={16} strokeWidth={2} />
+            </button>
+          )}
         </div>
       )}
     </header>

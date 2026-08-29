@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ShoppingCart } from 'lucide-react';
 import { formatPrice } from '../utils/format';
 import type { useCart } from '../hooks/useCart';
 
@@ -24,7 +25,7 @@ export function CartView({
   if (items.length === 0) {
     return (
       <div className="empty-state">
-        <span className="empty-state__icon">🛒</span>
+        <ShoppingCart className="empty-state__icon" size={40} strokeWidth={1.5} aria-hidden="true" />
         <h2>Кошик порожній</h2>
         <p>Оберіть товари з каталогу</p>
       </div>

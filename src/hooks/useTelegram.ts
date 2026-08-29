@@ -13,6 +13,21 @@ export function useTelegram() {
   const user = tg?.initDataUnsafe?.user;
   const isTelegram = Boolean(tg?.initData);
 
+  // Inside real Telegram, follow the client's live theme instead of the browser's
+  // prefers-color-scheme (Telegram controls the actual theme the user sees). Outside
+  // Telegram, window.Telegram.WebApp still exists as the SDK's own stub (always
+  // colorScheme: 'light'), so this must gate on isTelegram, not just `tg` being set —
+  // otherwise every non-Telegram visitor gets forced into light mode.
+  useEffect(() => {
+    if (!tg || !isTelegram) return;
+    const syncTheme = () => {
+      document.documentElement.setAttribute('data-theme', tg.colorScheme === 'dark' ? 'dark' : 'light');
+    };
+    syncTheme();
+    tg.onEvent?.('themeChanged', syncTheme);
+    return () => tg.offEvent?.('themeChanged', syncTheme);
+  }, [tg, isTelegram]);
+
   const haptic = (type: 'light' | 'success' | 'error' = 'light') => {
     if (!tg?.HapticFeedback) return;
     if (type === 'success' || type === 'error') {

@@ -4,15 +4,16 @@
     { "source": "/admin/upload", "destination": "/admin-upload.html" },
     { "source": "/admin/weights", "destination": "/admin-weights.html" },
     { "source": "/admin/banners", "destination": "/admin-banners.html" },
-    { "source": "/product/:id", "destination": "/api/ssr-product?id=:id" },
-    { "source": "/catalog/:categoryId", "destination": "/api/ssr-catalog?categoryId=:categoryId" },
+    { "source": "/api/auth/logout", "destination": "/api/auth/session" },
+    { "source": "/api/auth/me", "destination": "/api/auth/session" },
+    { "source": "/product/:id", "destination": "/api/ssr?id=:id" },
+    { "source": "/catalog/:categoryId", "destination": "/api/ssr?categoryId=:categoryId" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "crons": [
     { "path": "/api/cron/recompute-scores", "schedule": "0 3 * * *" }
   ],
   "functions": {
-    "api/ssr-product.ts": { "includeFiles": "dist/index.html" },
-    "api/ssr-catalog.ts": { "includeFiles": "dist/index.html" }
+    "api/ssr.ts": { "includeFiles": "dist/index.html" }
   }
 }

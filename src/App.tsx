@@ -22,14 +22,6 @@ import {
   saveOrderToLocalStorage,
 } from './utils/orderExport';
 
-const SCREEN_TITLES: Record<Screen, string> = {
-  home: 'Anons Shop',
-  catalog: 'Anons Shop',
-  product: 'Anons Shop',
-  cart: 'Кошик',
-  success: 'Готово',
-};
-
 const PAGE_SIZE = 24;
 
 // #root (not window) is the actual scroll container: `overflow-x: hidden` on html/body/#root
@@ -257,20 +249,16 @@ export default function App() {
     navigate('success');
   };
 
-  const showBottomNav = screen === 'home' || screen === 'catalog' || screen === 'cart';
+  const showBottomNav = screen === 'home' || screen === 'catalog' || screen === 'product' || screen === 'cart';
 
   return (
     <div className={`app ${showBottomNav ? 'app--with-nav' : ''}`}>
       <Header
-        title={SCREEN_TITLES[screen]}
-        cartCount={cart.totalItems}
-        showCart={screen === 'home' || screen === 'catalog' || screen === 'product'}
-        showSearch={screen === 'home' || screen === 'catalog'}
-        onCartClick={() => navigate('cart')}
+        showSearch={screen === 'home' || screen === 'catalog' || screen === 'product'}
         searchValue={filters.search}
         onSearchChange={(search) => setFilters({ ...filters, search })}
         onSearchFocus={() => {
-          if (screen === 'home') navigate('catalog');
+          if (screen === 'home' || screen === 'product') navigate('catalog');
         }}
         onHomeClick={() => navigate('home')}
       />

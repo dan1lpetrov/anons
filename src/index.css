@@ -120,25 +120,14 @@ img {
 .app-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px max(16px, calc((100% - var(--content-max)) / 2));
-}
-
-.app-header__search-row {
-  padding: 0 max(16px, calc((100% - var(--content-max)) / 2)) 12px;
-}
-
-.app-header__search-row .catalog-search {
-  margin: 0;
+  gap: 10px;
+  padding: 10px max(16px, calc((100% - var(--content-max)) / 2));
 }
 
 .app-header__brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-width: 0;
-  text-align: left;
+  flex-shrink: 0;
 }
 
 .app-header__logo {
@@ -154,41 +143,10 @@ img {
   font-size: 18px;
 }
 
-.app-header h1 {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.cart-button {
-  position: relative;
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-sm);
-  background: var(--tg-secondary-bg);
-  font-size: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.cart-button__badge {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  border-radius: 10px;
-  background: var(--tg-button);
-  color: var(--tg-button-text);
-  font-size: 11px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.app-header__search {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
 }
 
 .app-main {

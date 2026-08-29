@@ -33,11 +33,41 @@ function formatPointDate(recordedAt: string | null, withYear = false): string {
   });
 }
 
-function pickTickIndices(count: number): number[] {
-  const tickCount = Math.min(4, count);
-  if (tickCount <= 1) return [0];
-  const indices = Array.from({ length: tickCount }, (_, i) => Math.round((i * (count - 1)) / (tickCount - 1)));
-  return [...new Set(indices)];
+// Picking ticks by even index spacing (the old approach) ignores that `xs`
+// (real pixel positions) are time-proportional, not index-proportional —
+// with uneven gaps between recorded dates, two index-evenly-spaced ticks can
+// land close together in x and their date labels overlap. Pick by actual
+// position instead, enforcing a minimum pixel gap, and drop a candidate
+// tick rather than let it collide.
+const MIN_TICK_GAP = 46;
+
+function pickTickIndices(xs: number[]): number[] {
+  const last = xs.length - 1;
+  if (last <= 0) return [0];
+
+  const indices = [0];
+  let lastX = xs[0];
+  for (const frac of [1 / 3, 2 / 3]) {
+    if (indices.length >= 3) break;
+    const targetX = xs[0] + frac * (xs[last] - xs[0]);
+    let best = -1;
+    let bestDist = Infinity;
+    for (let i = 1; i < last; i++) {
+      if (indices.includes(i)) continue;
+      if (xs[i] - lastX < MIN_TICK_GAP || xs[last] - xs[i] < MIN_TICK_GAP) continue;
+      const dist = Math.abs(xs[i] - targetX);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = i;
+      }
+    }
+    if (best !== -1) {
+      indices.push(best);
+      lastX = xs[best];
+    }
+  }
+  if (xs[last] - lastX >= MIN_TICK_GAP || indices.length === 1) indices.push(last);
+  return indices;
 }
 
 export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
@@ -91,7 +121,7 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
 
   const maxY = yFor(max);
   const minY = yFor(min);
-  const tickIndices = pickTickIndices(coords.length);
+  const tickIndices = pickTickIndices(markerX);
   const active = activeIndex !== null ? coords[activeIndex] : null;
 
   function bandIndexForX(svgX: number): number {

@@ -36,7 +36,7 @@ export function ProductCard({ product, onClick, debug }: ProductCardProps) {
         <h3 className="product-card__name">{product.name}</h3>
         <div className="product-card__prices">
           <span className="product-card__price">
-            {hasPriceRange && 'від '}
+            {hasPriceRange && <span className="product-card__price-prefix">від </span>}
             {formatPrice(minPrice, product.currency)}
           </span>
           {originalPrice && (

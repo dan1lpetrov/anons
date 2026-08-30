@@ -5,7 +5,7 @@ import type { Product, ProductColor } from '../types';
 // `price` is in, even mid-way through a currency-switch repricing sweep. Falls back to USD for
 // products uploaded before this field existed.
 export function formatPrice(price: number, currency: 'USD' | 'UAH' = 'USD'): string {
-  if (currency === 'UAH') return `${Math.round(price).toLocaleString('uk-UA')} ₴`;
+  if (currency === 'UAH') return `${Math.round(price).toLocaleString('uk-UA')} ₴`;
   return `$${price.toLocaleString('en-US')}`;
 }
 

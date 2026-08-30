@@ -1,7 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, ensureSchema } from './_lib/db.js';
 import { requireAdmin } from './_lib/session.js';
-import { recordPriceChanges } from './_lib/pricing.js';
+import { recordPriceChanges, repriceProductData, type ProductData, type SaleConditions } from './_lib/pricing.js';
+import { getSiteCurrency } from './_lib/siteSettings.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   await ensureSchema();
@@ -61,23 +62,25 @@ async function handlePost(req: VercelRequest, res: VercelResponse) {
       !p ||
       typeof p.id !== 'string' ||
       typeof p.name !== 'string' ||
-      typeof p.price !== 'number' ||
+      typeof p.basePrice !== 'number' ||
       typeof p.categoryId !== 'string' ||
       typeof p.saleId !== 'string' ||
       !Array.isArray(p.sizes) ||
       !Array.isArray(p.colors)
     ) {
       return res.status(400).json({
-        error: 'Кожен товар має містити id, name, price, categoryId, saleId, sizes[], colors[]',
+        error: 'Кожен товар має містити id, name, basePrice, categoryId, saleId, sizes[], colors[]',
       });
     }
   }
 
   const client = await db.connect();
   try {
-    const { rows: eventRows } = await client.query<{ sale_id: string }>('SELECT sale_id FROM sale_events WHERE id = $1', [
-      saleEventId,
-    ]);
+    const { rows: eventRows } = await client.query<{
+      sale_id: string;
+      buyer_commission_percent: string;
+      additional_discount_percent: string;
+    }>('SELECT sale_id, buyer_commission_percent, additional_discount_percent FROM sale_events WHERE id = $1', [saleEventId]);
     if (eventRows.length === 0) {
       return res.status(400).json({ error: 'Розпродаж (кампанія) не знайдено' });
     }
@@ -86,15 +89,28 @@ async function handlePost(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: `Усі товари в цьому завантаженні мають належати бренду "${brand}"` });
     }
 
+    // The price shown/sold is always derived from basePrice + this campaign's commission/
+    // discount + the site's current display currency — never trusted from the client, so it
+    // can't drift out of sync with a conditions edit made after the client loaded the page.
+    const conditions: SaleConditions = {
+      buyerCommissionPercent: Number(eventRows[0].buyer_commission_percent),
+      additionalDiscountPercent: Number(eventRows[0].additional_discount_percent),
+    };
+    const currency = await getSiteCurrency();
+    const priced: (ProductData & Record<string, unknown>)[] = products.map((p) => repriceProductData(p, conditions, currency));
+
     await client.query('BEGIN');
-    await recordPriceChanges(client, products);
+    await recordPriceChanges(
+      client,
+      priced.map((p) => ({ id: p.id as string, price: p.price as number, colors: p.colors ?? [] })),
+    );
 
     // Never truncates or deletes — a product is inserted if it's new to this campaign, or its
     // price/data updated in place if the same SKU is re-uploaded into the SAME campaign. Other
     // campaigns' rows (including other campaigns of the same brand, or this SKU in one of them)
     // are never touched by an upload.
     const values: unknown[] = [];
-    const rows = products.map((p, i) => {
+    const rows = priced.map((p, i) => {
       const base = i * 6;
       values.push(p.id, p.categoryId, p.saleId, saleEventId, p.featuredRank ?? 0, JSON.stringify(p));
       return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}::jsonb)`;

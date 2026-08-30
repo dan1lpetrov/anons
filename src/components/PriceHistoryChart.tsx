@@ -9,6 +9,7 @@ interface PricePoint {
 
 interface PriceHistoryChartProps {
   points: PricePoint[];
+  currency?: 'USD' | 'UAH';
 }
 
 const WIDTH = 280;
@@ -70,7 +71,7 @@ function pickTickIndices(xs: number[]): number[] {
   return indices;
 }
 
-export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
+export function PriceHistoryChart({ points, currency }: PriceHistoryChartProps) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   if (points.length < 2) return null;
 
@@ -140,7 +141,7 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
     <div className="price-history">
       <p className="price-history__label">Історія ціни</p>
       <div className="price-history__chart-wrap">
-        <span className="price-history__gridlabel">{formatPrice(max)}</span>
+        <span className="price-history__gridlabel">{formatPrice(max, currency)}</span>
         <div className="price-history__plot" style={{ height: HEIGHT }}>
           <svg
             className="price-history__chart"
@@ -178,12 +179,12 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
                 }, ${active.y < HEIGHT / 2 ? '8px' : 'calc(-100% - 8px)'})`,
               }}
             >
-              <strong>{formatPrice(active.price)}</strong>
+              <strong>{formatPrice(active.price, currency)}</strong>
               <span>{formatPointDate(active.recordedAt, true)}</span>
             </div>
           )}
         </div>
-        <span className="price-history__gridlabel">{formatPrice(min)}</span>
+        <span className="price-history__gridlabel">{formatPrice(min, currency)}</span>
       </div>
       <div className="price-history__axis">
         {coords.map((c, i) => {

@@ -38,6 +38,8 @@ export interface Product {
   /** Raw scraped price before the sale campaign's reseller markup — see admin-upload.html. */
   basePrice?: number;
   baseOriginalPrice?: number;
+  /** Site-wide display currency price/originalPrice are actually in — see api/_lib/pricing.ts. */
+  currency?: 'USD' | 'UAH';
   categoryId: CategoryId;
   saleId: SaleId;
   sourceName: string;

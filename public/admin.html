@@ -128,8 +128,13 @@
     return Math.round(n).toLocaleString('en-US');
   }
 
+  // Set from the dashboard response's `currency` field (site-wide display currency — see
+  // api/_lib/siteSettings.ts) before any fmtMoney() call, so the revenue KPI's symbol matches
+  // whatever currency prices are actually shown in right now.
+  let currentCurrencySymbol = '$';
+
   function fmtMoney(n) {
-    return '$' + fmtNum(n);
+    return currentCurrencySymbol === '₴' ? fmtNum(n) + ' ₴' : '$' + fmtNum(n);
   }
 
   function deltaBadge(deltaPct) {
@@ -339,6 +344,7 @@
         throw new Error(body.error || `HTTP ${res.status}`);
       }
       const data = await res.json();
+      currentCurrencySymbol = data.currency === 'UAH' ? '₴' : '$';
       renderKpi(data.kpi, data.series);
       renderHeatmap(data.heatmap);
       renderSalesEnding(data.salesEnding);

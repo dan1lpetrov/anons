@@ -47,25 +47,12 @@
 
         <div id="conditionsSection" class="hidden" style="margin-top: 16px;">
           <label>Умови розпродажу</label>
+          <p class="hint">Валюта показу тепер спільна для всього сайту — редагується в <a href="/admin/sales">Розпродажах</a>.</p>
           <div id="conditionsEditor" class="conditions-grid">
             <label for="conditionCommission">Комісія баєра, %</label>
             <input id="conditionCommission" type="number" step="0.1" min="0" value="10" />
             <label for="conditionDiscount">Додаткова знижка, %</label>
             <input id="conditionDiscount" type="number" step="0.1" min="0" value="0" />
-            <label for="conditionCurrency">Валюта показу</label>
-            <select id="conditionCurrency">
-              <option value="original">Оригінальна (USD)</option>
-              <option value="uah">Гривня (за курсом банку)</option>
-            </select>
-            <label for="conditionBank" id="conditionBankLabel" class="hidden">Банк</label>
-            <select id="conditionBank" class="hidden">
-              <option value="mono">Monobank (курс — автоматично)</option>
-              <option value="privat">ПриватБанк (курс — автоматично)</option>
-              <option value="pumb">ПУМБ (курс — вручну)</option>
-              <option value="sens">Sense Bank (курс — вручну)</option>
-            </select>
-            <label for="conditionManualRate" id="conditionManualRateLabel" class="hidden">Курс, ₴ за $1</label>
-            <input id="conditionManualRate" type="number" step="0.0001" min="0" class="hidden" placeholder="напр. 41.5" />
           </div>
           <div id="conditionsReadonly" class="conditions-summary hidden"></div>
         </div>
@@ -95,30 +82,11 @@
   const conditionsReadonly = document.getElementById('conditionsReadonly');
   const conditionCommission = document.getElementById('conditionCommission');
   const conditionDiscount = document.getElementById('conditionDiscount');
-  const conditionCurrency = document.getElementById('conditionCurrency');
-  const conditionBank = document.getElementById('conditionBank');
-  const conditionBankLabel = document.getElementById('conditionBankLabel');
-  const conditionManualRate = document.getElementById('conditionManualRate');
-  const conditionManualRateLabel = document.getElementById('conditionManualRateLabel');
 
-  const BANK_NAMES = { mono: 'Monobank', privat: 'ПриватБанк', pumb: 'ПУМБ', sens: 'Sense Bank' };
-  const MANUAL_RATE_BANKS = new Set(['pumb', 'sens']);
-
-  function updateConditionsVisibility() {
-    const isUah = conditionCurrency.value === 'uah';
-    conditionBank.classList.toggle('hidden', !isUah);
-    conditionBankLabel.classList.toggle('hidden', !isUah);
-    const needsManualRate = isUah && MANUAL_RATE_BANKS.has(conditionBank.value);
-    conditionManualRate.classList.toggle('hidden', !needsManualRate);
-    conditionManualRateLabel.classList.toggle('hidden', !needsManualRate);
-  }
-  conditionCurrency.addEventListener('change', updateConditionsVisibility);
-  conditionBank.addEventListener('change', updateConditionsVisibility);
-  updateConditionsVisibility();
-
-  // Conditions are fixed at campaign creation — editable only while creating a new campaign;
-  // picking an existing one just shows what was set for it (new products uploaded into it must
-  // use the same conditions, so the whole campaign's pricing stays consistent).
+  // Conditions (commission/discount) are fixed at campaign creation — editable only while
+  // creating a new campaign; picking an existing one just shows what was set for it (the server
+  // always reprices new uploads using the target campaign's own stored conditions, regardless
+  // of what these fields show, so this is display-only once a campaign is picked).
   function renderConditionsForSelection() {
     if (selectedCampaignId === null) {
       conditionsEditor.classList.remove('hidden');
@@ -128,18 +96,9 @@
     const campaign = campaigns.find((c) => c.id === selectedCampaignId);
     conditionsEditor.classList.add('hidden');
     conditionsReadonly.classList.remove('hidden');
-    if (!campaign) {
-      conditionsReadonly.textContent = '';
-      return;
-    }
-    const parts = [
-      `комісія баєра ${campaign.buyerCommissionPercent}%`,
-      `додаткова знижка ${campaign.additionalDiscountPercent}%`,
-      campaign.displayCurrency === 'uah'
-        ? `ціни в грн (${BANK_NAMES[campaign.uahBank] || campaign.uahBank}, курс ${campaign.uahRate})`
-        : 'ціни в оригінальній валюті (USD)',
-    ];
-    conditionsReadonly.textContent = parts.join(' · ');
+    conditionsReadonly.textContent = campaign
+      ? `комісія баєра ${campaign.buyerCommissionPercent}% · додаткова знижка ${campaign.additionalDiscountPercent}%`
+      : '';
   }
 
   function readConditionsFromEditor() {
@@ -151,59 +110,7 @@
     if (!Number.isFinite(additionalDiscountPercent) || additionalDiscountPercent < 0) {
       throw new Error('Додаткова знижка має бути невідʼємним числом.');
     }
-    const displayCurrency = conditionCurrency.value;
-    const result = { buyerCommissionPercent, additionalDiscountPercent, displayCurrency };
-    if (displayCurrency === 'uah') {
-      result.uahBank = conditionBank.value;
-      if (MANUAL_RATE_BANKS.has(conditionBank.value)) {
-        const manualRate = Number(conditionManualRate.value);
-        if (!Number.isFinite(manualRate) || manualRate <= 0) {
-          throw new Error(`Для ${BANK_NAMES[conditionBank.value]} потрібно вказати курс вручну (додатне число).`);
-        }
-        result.uahRate = manualRate;
-      }
-    }
-    return result;
-  }
-
-  // final = price × (1 − знижка% ⁄ 100) × (1 + комісія% ⁄ 100), потім × курс, якщо ціни в грн.
-  function applySaleConditions(price, cond) {
-    if (typeof price !== 'number') return price;
-    let p = price * (1 - cond.additionalDiscountPercent / 100);
-    p = p * (1 + cond.buyerCommissionPercent / 100);
-    if (cond.displayCurrency === 'uah' && cond.uahRate) p = p * cond.uahRate;
-    return Math.round(p * 100) / 100;
-  }
-
-  // Always derives price/originalPrice from basePrice/baseOriginalPrice (the raw, pre-markup
-  // scraped price), never from a possibly-already-marked-up price/originalPrice — otherwise
-  // reloading current (already priced) products via "Завантажити поточні товари" and
-  // re-uploading them would stack the markup on top of itself. Products uploaded before this
-  // feature existed have no basePrice field; for those, price/originalPrice IS the base (no
-  // markup was ever applied), so falling back to it is correct, not just a safe default.
-  function applySaleConditionsToProducts(products, cond) {
-    return products.map((p) => {
-      const basePrice = typeof p.basePrice === 'number' ? p.basePrice : p.price;
-      const baseOriginalPrice = typeof p.baseOriginalPrice === 'number' ? p.baseOriginalPrice : p.originalPrice;
-      return {
-        ...p,
-        basePrice,
-        baseOriginalPrice,
-        price: applySaleConditions(basePrice, cond),
-        originalPrice: applySaleConditions(baseOriginalPrice, cond),
-        colors: (p.colors || []).map((c) => {
-          const cBasePrice = typeof c.basePrice === 'number' ? c.basePrice : c.price;
-          const cBaseOriginalPrice = typeof c.baseOriginalPrice === 'number' ? c.baseOriginalPrice : c.originalPrice;
-          return {
-            ...c,
-            ...(cBasePrice !== undefined ? { basePrice: cBasePrice, price: applySaleConditions(cBasePrice, cond) } : {}),
-            ...(cBaseOriginalPrice !== undefined
-              ? { baseOriginalPrice: cBaseOriginalPrice, originalPrice: applySaleConditions(cBaseOriginalPrice, cond) }
-              : {}),
-          };
-        }),
-      };
-    });
+    return { buyerCommissionPercent, additionalDiscountPercent };
   }
 
   function parseProductsPayload(text) {
@@ -276,10 +183,10 @@
           ? [...new Set(c.sizes.filter((s) => s && s.available !== false).map(displaySize))]
           : [],
         // basePrice/baseOriginalPrice = raw scraped price, before any sale-conditions markup
-        // (buyer commission, discount, currency conversion — see applySaleConditionsToProducts).
-        // Keeping these separate from price/originalPrice is what makes reloading already-priced
-        // products via "Завантажити поточні товари" and re-uploading idempotent instead of
-        // stacking the markup on top of itself.
+        // (buyer commission, discount, currency conversion) — the server derives price/
+        // originalPrice from this on every upload (see api/products.ts). Sending base* instead
+        // of a pre-marked-up price is what makes reloading already-priced products via
+        // "Завантажити поточні товари" and re-uploading idempotent instead of stacking markup.
         ...(colorPrice !== undefined ? { basePrice: colorPrice } : {}),
         ...(colorOriginalPrice !== undefined ? { baseOriginalPrice: colorOriginalPrice } : {}),
       };
@@ -492,19 +399,9 @@
         AdminShared.setStatus(statusEl, 'err', err.message);
         return;
       }
-    } else {
-      const campaign = campaigns.find((c) => c.id === selectedCampaignId);
-      if (!campaign) {
-        AdminShared.setStatus(statusEl, 'err', 'Обрана кампанія більше не існує — онови сторінку.');
-        return;
-      }
-      conditions = {
-        buyerCommissionPercent: campaign.buyerCommissionPercent,
-        additionalDiscountPercent: campaign.additionalDiscountPercent,
-        displayCurrency: campaign.displayCurrency,
-        uahBank: campaign.uahBank,
-        uahRate: campaign.uahRate,
-      };
+    } else if (!campaigns.some((c) => c.id === selectedCampaignId)) {
+      AdminShared.setStatus(statusEl, 'err', 'Обрана кампанія більше не існує — онови сторінку.');
+      return;
     }
 
     uploadBtn.disabled = true;
@@ -528,19 +425,11 @@
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
         saleEventId = body.id;
-        // The server resolves the actual bank rate (auto-fetched for mono/privat) — use that,
-        // not whatever was in the manual-rate field, so uploaded prices match what got saved.
-        conditions = {
-          buyerCommissionPercent: body.buyerCommissionPercent,
-          additionalDiscountPercent: body.additionalDiscountPercent,
-          displayCurrency: body.displayCurrency,
-          uahBank: body.uahBank,
-          uahRate: body.uahRate,
-        };
       }
 
-      const priced = applySaleConditionsToProducts(parsed, conditions);
-      const batches = chunkProductsForUpload(priced);
+      // The server derives price/originalPrice from each product's basePrice + this campaign's
+      // commission/discount + the site's current display currency — nothing to compute here.
+      const batches = chunkProductsForUpload(parsed);
       for (let i = 0; i < batches.length; i++) {
         const batchLabel = batches.length > 1 ? ` (${i + 1}/${batches.length})` : '';
         AdminShared.setStatus(statusEl, 'pending', `Заливаю...${batchLabel}`);

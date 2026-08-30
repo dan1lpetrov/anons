@@ -1,6 +1,14 @@
 import type { Order } from '../types';
 
+// order.items[].product.currency ('USD'/'UAH', see api/_lib/pricing.ts) rather than a hardcoded
+// symbol — this text is what the shop owner reads to manually re-purchase on the source site,
+// so it has to say the currency the price actually is in.
+function currencySymbol(currency?: 'USD' | 'UAH'): string {
+  return currency === 'UAH' ? '₴' : '$';
+}
+
 export function formatOrderText(order: Order): string {
+  const symbol = currencySymbol(order.items[0]?.product.currency);
   const lines: string[] = [
     '═══════════════════════════════════════',
     '         ЗАМОВЛЕННЯ ANONS SHOP',
@@ -35,14 +43,14 @@ export function formatOrderText(order: Order): string {
     lines.push(`   Розмір:    ${entry.size}`);
     lines.push(`   Колір:     ${entry.color.name}`);
     lines.push(`   Кількість: ${entry.quantity}`);
-    lines.push(`   Ціна:      ${entry.lineTotal / entry.quantity} ₴ × ${entry.quantity} = ${entry.lineTotal} ₴`);
+    lines.push(`   Ціна:      ${entry.lineTotal / entry.quantity} ${symbol} × ${entry.quantity} = ${entry.lineTotal} ${symbol}`);
     lines.push(`   Джерело:   ${entry.product.sourceName}`);
     lines.push(`   Посилання: ${entry.product.sourceUrl}`);
   });
 
   lines.push('');
   lines.push('───────────────────────────────────────');
-  lines.push(`РАЗОМ: ${order.total} ₴`);
+  lines.push(`РАЗОМ: ${order.total} ${symbol}`);
   lines.push('');
   lines.push('⚠️  Увага: це замовлення для ручного викупу');
   lines.push('    на сайтах-джерелах. Оплата не проводиться');

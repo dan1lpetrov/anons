@@ -184,6 +184,23 @@ async function runEnsureSchema(): Promise<void> {
           CHECK (id = 1)
         );
       `);
+      // Site-wide display currency — one row, applies to every product regardless of which sale
+      // campaign it's in (see api/_lib/siteSettings.ts). buyer_commission_percent /
+      // additional_discount_percent stay per-campaign on sale_events; only currency is global —
+      // changing it here reprices every product in one sweep (api/sales.ts's `global=1` branch).
+      // sale_events.display_currency/uah_bank/uah_rate (added, then superseded by this table in
+      // the same feature's follow-up) are left in place unused rather than dropped — same
+      // don't-drop-columns-on-live-data precedent as sale_windows above.
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS site_settings (
+          id INTEGER PRIMARY KEY DEFAULT 1,
+          display_currency TEXT NOT NULL DEFAULT 'original',
+          uah_bank TEXT,
+          uah_rate NUMERIC,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          CHECK (id = 1)
+        );
+      `);
     } finally {
       await client.query('SELECT pg_advisory_unlock($1)', [SCHEMA_LOCK_KEY]);
     }

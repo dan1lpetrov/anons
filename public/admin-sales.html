@@ -31,8 +31,18 @@
       </div>
 
       <section>
+        <h2>Валюта показу на сайті</h2>
+        <p class="hint">Спільна для всього сайту, не залежить від розпродажу. Комісія/знижка лишаються окремо для кожного розпродажу нижче.</p>
+        <div id="currencyEditor"></div>
+        <div class="row" style="margin-top: 12px;">
+          <button id="saveCurrency" class="primary" type="button">Зберегти валюту (перерахує ціни всіх товарів)</button>
+        </div>
+        <div id="currencyStatus" class="status"></div>
+      </section>
+
+      <section>
         <div class="row" style="justify-content: space-between;">
-          <span class="hint">Термін дії, активність і видалення розпродажів</span>
+          <span class="hint">Термін дії, активність, комісія/знижка і видалення розпродажів</span>
           <button id="reloadSales" class="secondary" type="button">Оновити</button>
         </div>
         <div id="salesList"></div>
@@ -48,6 +58,9 @@
   const salesList = document.getElementById('salesList');
   const salesStatus = document.getElementById('salesStatus');
   const reloadSalesBtn = document.getElementById('reloadSales');
+  const currencyEditorEl = document.getElementById('currencyEditor');
+  const currencyStatus = document.getElementById('currencyStatus');
+  const saveCurrencyBtn = document.getElementById('saveCurrency');
 
   const ERROR_MESSAGES = {
     forbidden: 'Цей Google-акаунт не має доступу до адмінки.',
@@ -56,7 +69,6 @@
     token_exchange_failed: 'Не вдалося завершити вхід через Google.',
   };
 
-  const BANK_NAMES = { mono: 'Monobank', privat: 'ПриватБанк', pumb: 'ПУМБ', sens: 'Sense Bank' };
   const MANUAL_RATE_BANKS = new Set(['pumb', 'sens']);
   const AUTO_RATE_BANKS = new Set(['mono', 'privat']);
 
@@ -161,15 +173,12 @@
   }
 
   function formatConditions(sale) {
-    return [
-      `комісія ${sale.buyerCommissionPercent}%`,
-      `знижка ${sale.additionalDiscountPercent}%`,
-      sale.displayCurrency === 'uah' ? `грн (${BANK_NAMES[sale.uahBank] || sale.uahBank}, курс ${sale.uahRate})` : 'USD',
-    ].join(' · ');
+    return `комісія ${sale.buyerCommissionPercent}% · знижка ${sale.additionalDiscountPercent}%`;
   }
 
-  // Every campaign has its own editable set of conditions (commission/discount/currency/bank/
-  // rate) — building this per sale-row rather than sharing one global form keeps that explicit.
+  // Every campaign has its own editable commission/discount — building this per sale-row rather
+  // than sharing one global form keeps that explicit. Currency lives in the global panel above
+  // instead (see buildCurrencyEditor), since it's the same for every campaign on the site.
   function buildConditionsPanel(sale, onSave) {
     const panel = document.createElement('div');
     panel.className = 'conditions-grid';
@@ -187,12 +196,48 @@
     discountInput.min = '0';
     discountInput.value = sale.additionalDiscountPercent;
 
+    function labeled(text) {
+      const label = document.createElement('label');
+      label.textContent = text;
+      return label;
+    }
+
+    const saveConditionsBtn = document.createElement('button');
+    saveConditionsBtn.type = 'button';
+    saveConditionsBtn.className = 'primary';
+    saveConditionsBtn.textContent = 'Зберегти умови (перерахує ціни товарів)';
+    saveConditionsBtn.addEventListener('click', onSave);
+
+    panel._inputs = { commissionInput, discountInput };
+
+    panel.append(
+      labeled('Комісія баєра, %'),
+      commissionInput,
+      labeled('Додаткова знижка, %'),
+      discountInput,
+      document.createElement('div'),
+      saveConditionsBtn,
+    );
+    return panel;
+  }
+
+  function readPanelConditions(panel) {
+    const { commissionInput, discountInput } = panel._inputs;
+    return {
+      buyerCommissionPercent: Number(commissionInput.value),
+      additionalDiscountPercent: Number(discountInput.value),
+    };
+  }
+
+  // --- Site-wide display currency (see api/_lib/siteSettings.ts) ---
+  let currencyInputs = null;
+
+  function buildCurrencyEditor() {
     const currencySelect = document.createElement('select');
     currencySelect.innerHTML = `
       <option value="original">Оригінальна (USD)</option>
       <option value="uah">Гривня (за курсом банку)</option>
     `;
-    currencySelect.value = sale.displayCurrency;
 
     const bankSelect = document.createElement('select');
     bankSelect.innerHTML = `
@@ -201,14 +246,12 @@
       <option value="pumb">ПУМБ (курс — вручну)</option>
       <option value="sens">Sense Bank (курс — вручну)</option>
     `;
-    bankSelect.value = sale.uahBank || 'mono';
 
     const rateInput = document.createElement('input');
     rateInput.type = 'number';
     rateInput.step = '0.0001';
     rateInput.min = '0';
     rateInput.placeholder = 'напр. 41.5';
-    if (sale.uahRate) rateInput.value = sale.uahRate;
 
     const refreshRateBtn = document.createElement('button');
     refreshRateBtn.type = 'button';
@@ -225,7 +268,7 @@
         if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
         rateInput.value = body.rate;
       } catch (err) {
-        AdminShared.setStatus(salesStatus, 'err', 'Помилка: ' + err.message);
+        AdminShared.setStatus(currencyStatus, 'err', 'Помилка: ' + err.message);
       } finally {
         refreshRateBtn.disabled = false;
       }
@@ -234,6 +277,14 @@
     const rateRow = document.createElement('div');
     rateRow.className = 'row';
     rateRow.append(rateInput, refreshRateBtn);
+
+    function labeled(text) {
+      const label = document.createElement('label');
+      label.textContent = text;
+      return label;
+    }
+    const bankLabel = labeled('Банк');
+    const rateLabel = labeled('Курс, ₴ за $1');
 
     function updateVisibility() {
       const isUah = currencySelect.value === 'uah';
@@ -246,58 +297,65 @@
     currencySelect.addEventListener('change', updateVisibility);
     bankSelect.addEventListener('change', updateVisibility);
 
-    function labeled(text) {
-      const label = document.createElement('label');
-      label.textContent = text;
-      return label;
-    }
-    const commissionLabel = labeled('Комісія баєра, %');
-    const discountLabel = labeled('Додаткова знижка, %');
-    const currencyLabel = labeled('Валюта показу');
-    const bankLabel = labeled('Банк');
-    const rateLabel = labeled('Курс, ₴ за $1');
+    const panel = document.createElement('div');
+    panel.className = 'conditions-grid';
+    panel.append(labeled('Валюта показу'), currencySelect, bankLabel, bankSelect, rateLabel, rateRow);
+    currencyEditorEl.innerHTML = '';
+    currencyEditorEl.appendChild(panel);
 
-    const saveConditionsBtn = document.createElement('button');
-    saveConditionsBtn.type = 'button';
-    saveConditionsBtn.className = 'primary';
-    saveConditionsBtn.textContent = 'Зберегти умови (перерахує ціни товарів)';
-    saveConditionsBtn.addEventListener('click', onSave);
-
-    panel._inputs = { commissionInput, discountInput, currencySelect, bankSelect, rateInput };
-
-    panel.append(
-      commissionLabel,
-      commissionInput,
-      discountLabel,
-      discountInput,
-      currencyLabel,
-      currencySelect,
-      bankLabel,
-      bankSelect,
-      rateLabel,
-      rateRow,
-      document.createElement('div'),
-      saveConditionsBtn,
-    );
+    currencyInputs = { currencySelect, bankSelect, rateInput };
     updateVisibility();
-    return panel;
   }
 
-  function readPanelConditions(panel) {
-    const { commissionInput, discountInput, currencySelect, bankSelect, rateInput } = panel._inputs;
-    const conditions = {
-      buyerCommissionPercent: Number(commissionInput.value),
-      additionalDiscountPercent: Number(discountInput.value),
-      displayCurrency: currencySelect.value,
-    };
+  async function loadCurrency() {
+    AdminShared.setStatus(currencyStatus, 'pending', 'Завантаження...');
+    try {
+      const res = await fetch('/api/sales?global=1', { cache: 'no-store', credentials: 'include' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      const currency = await res.json();
+      if (!currencyInputs) buildCurrencyEditor();
+      currencyInputs.currencySelect.value = currency.displayCurrency;
+      currencyInputs.bankSelect.value = currency.uahBank || 'mono';
+      if (currency.uahRate) currencyInputs.rateInput.value = currency.uahRate;
+      currencyInputs.currencySelect.dispatchEvent(new Event('change'));
+      currencyStatus.className = 'status';
+    } catch (err) {
+      AdminShared.setStatus(currencyStatus, 'err', 'Помилка: ' + err.message);
+    }
+  }
+
+  saveCurrencyBtn.addEventListener('click', async () => {
+    if (!currencyInputs) return;
+    const { currencySelect, bankSelect, rateInput } = currencyInputs;
+    const payload = { global: true, displayCurrency: currencySelect.value };
     if (currencySelect.value === 'uah') {
-      conditions.uahBank = bankSelect.value;
+      payload.uahBank = bankSelect.value;
       if (MANUAL_RATE_BANKS.has(bankSelect.value) || rateInput.value) {
-        conditions.uahRate = Number(rateInput.value);
+        payload.uahRate = Number(rateInput.value);
       }
     }
-    return conditions;
-  }
+    saveCurrencyBtn.disabled = true;
+    AdminShared.setStatus(currencyStatus, 'pending', 'Зберігаю валюту й перераховую ціни всіх товарів...');
+    try {
+      const res = await fetch('/api/sales', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      AdminShared.setStatus(currencyStatus, 'ok', `Збережено. Перераховано цін: ${body.repricedCount ?? 0}.`);
+      if (body.uahRate) rateInput.value = body.uahRate;
+    } catch (err) {
+      AdminShared.setStatus(currencyStatus, 'err', 'Помилка: ' + err.message);
+    } finally {
+      saveCurrencyBtn.disabled = false;
+    }
+  });
 
   async function saveSale(id, { name, endDate, active }, conditions) {
     AdminShared.setStatus(salesStatus, 'pending', conditions ? 'Зберігаю умови й перераховую ціни...' : 'Збереження...');
@@ -341,7 +399,10 @@
   reloadSalesBtn.addEventListener('click', loadSales);
 
   AdminShared.init('sales').then((email) => {
-    if (email) loadSales();
+    if (email) {
+      loadCurrency();
+      loadSales();
+    }
   });
 </script>
 </body>

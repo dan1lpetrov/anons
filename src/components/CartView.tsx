@@ -43,7 +43,7 @@ export function CartView({
               <p className="cart-item__meta">
                 {color.name} · {item.size}
               </p>
-              <p className="cart-item__price">{formatPrice(lineTotal)}</p>
+              <p className="cart-item__price">{formatPrice(lineTotal, product.currency)}</p>
               <div className="cart-item__actions">
                 <div className="quantity-control quantity-control--sm">
                   <button
@@ -78,7 +78,7 @@ export function CartView({
       <div className="cart-summary">
         <div className="cart-summary__row">
           <span>Разом</span>
-          <strong>{formatPrice(totalPrice)}</strong>
+          <strong>{formatPrice(totalPrice, items[0]?.product.currency)}</strong>
         </div>
         <div className="form-field cart-comment-field">
           <label htmlFor="comment">Коментар</label>

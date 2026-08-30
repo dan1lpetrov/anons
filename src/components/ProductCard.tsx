@@ -37,10 +37,10 @@ export function ProductCard({ product, onClick, debug }: ProductCardProps) {
         <div className="product-card__prices">
           <span className="product-card__price">
             {hasPriceRange && 'від '}
-            {formatPrice(minPrice)}
+            {formatPrice(minPrice, product.currency)}
           </span>
           {originalPrice && (
-            <span className="product-card__original">{formatPrice(originalPrice)}</span>
+            <span className="product-card__original">{formatPrice(originalPrice, product.currency)}</span>
           )}
         </div>
         <div className="product-card__meta">

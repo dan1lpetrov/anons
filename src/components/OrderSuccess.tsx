@@ -15,7 +15,7 @@ export function OrderSuccess({ order, onContinue }: OrderSuccessProps) {
       <p className="success-id">№ {order.id}</p>
 
       <div className="success-details">
-        <p>Разом: <strong>{formatPrice(order.total)}</strong></p>
+        <p>Разом: <strong>{formatPrice(order.total, order.items[0]?.product.currency)}</strong></p>
         <p>{order.items.length} позицій у замовленні</p>
       </div>
 
@@ -28,7 +28,7 @@ export function OrderSuccess({ order, onContinue }: OrderSuccessProps) {
               <strong>{item.product.name}</strong>
               <span>{item.color.name} · {item.size} · {item.quantity} шт.</span>
             </div>
-            <b>{formatPrice(item.lineTotal)}</b>
+            <b>{formatPrice(item.lineTotal, item.product.currency)}</b>
           </li>
         ))}
       </ul>

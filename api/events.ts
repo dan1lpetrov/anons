@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, ensureSchema } from './_lib/db.js';
 import { bestDiscount, type ProductData } from './_lib/pricing.js';
 import { requireAdmin } from './_lib/session.js';
+import { getSiteCurrency } from './_lib/siteSettings.js';
 
 const EVENT_TYPES = new Set(['view', 'order']);
 const MAX_EVENTS_PER_REQUEST = 50;
@@ -104,7 +105,13 @@ async function handleGetDashboard(req: VercelRequest, res: VercelResponse) {
       loadTopProducts(days),
     ]);
 
-    return res.status(200).json({ range: { days }, kpi, series, heatmap, salesEnding, brands, topProducts });
+    // Revenue is SUM(quantity * unit_price) over historical order events, each captured in
+    // whatever the site's display currency was at that order's moment — so a currency switch
+    // mid-range still mixes units in the sum, same class of issue price_history had. Showing
+    // the *current* currency's symbol here is a display fix, not a fix for that mixing; there's
+    // no per-event currency tag to resolve it properly.
+    const currency = (await getSiteCurrency()).displayCurrency === 'uah' ? 'UAH' : 'USD';
+    return res.status(200).json({ range: { days }, currency, kpi, series, heatmap, salesEnding, brands, topProducts });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: 'Не вдалося завантажити дані дашборду' });

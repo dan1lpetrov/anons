@@ -209,13 +209,13 @@ export function ProductDetail({ product, onAddToCart, onBack, onShare }: Product
         </h1>
 
         <div className="product-detail__prices">
-          <span className="product-detail__price">{formatPrice(price)}</span>
+          <span className="product-detail__price">{formatPrice(price, product.currency)}</span>
           {originalPrice && (
-            <span className="product-detail__original">{formatPrice(originalPrice)}</span>
+            <span className="product-detail__original">{formatPrice(originalPrice, product.currency)}</span>
           )}
         </div>
 
-        <PriceHistoryChart points={pricePoints} />
+        <PriceHistoryChart points={pricePoints} currency={product.currency} />
 
         <p className="product-detail__desc">{product.description}</p>
 
@@ -292,7 +292,7 @@ export function ProductDetail({ product, onAddToCart, onBack, onShare }: Product
         </div>
 
         <button type="button" className="btn-primary btn-full" onClick={handleAdd}>
-          Додати в кошик — {formatPrice(price * quantity)}
+          Додати в кошик — {formatPrice(price * quantity, product.currency)}
         </button>
       </div>
     </div>

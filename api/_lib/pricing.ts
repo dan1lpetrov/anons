@@ -12,6 +12,7 @@ export interface ProductData {
   originalPrice?: unknown;
   basePrice?: unknown;
   baseOriginalPrice?: unknown;
+  currency?: unknown;
   colors?: ProductColorData[];
 }
 
@@ -71,31 +72,39 @@ export async function recordPriceChanges(client: VercelPoolClient, products: Pri
   );
 }
 
+// Per-campaign (sale_events) — how much the reseller marks the price up.
 export interface SaleConditions {
   buyerCommissionPercent: number;
   additionalDiscountPercent: number;
-  displayCurrency: string;
+}
+
+// Site-wide (site_settings) — what currency every product is shown in, not tied to any one
+// campaign. See api/_lib/siteSettings.ts for why this isn't part of SaleConditions.
+export interface DisplayCurrency {
+  displayCurrency: 'original' | 'uah';
   uahRate: number | null;
 }
 
-// price × (1 − discount%) × (1 + commission%), then × rate if displaying in UAH. Mirrors
-// applySaleConditions() in public/admin-upload.html — kept in sync by hand, since one is
-// browser JS run at upload time and the other is this server-side repricing pass (see
-// repriceProductData below), run when an admin edits an existing campaign's conditions.
-function applySaleMarkup(basePrice: number | undefined, cond: SaleConditions): number | undefined {
+// price × (1 − discount%) × (1 + commission%), then × rate if the site displays in UAH. This is
+// the single place this formula lives — every price shown anywhere on the site or in admin
+// traces back to a call to repriceProductData below, which calls this per field.
+function applySaleMarkup(basePrice: number | undefined, cond: SaleConditions, currency: DisplayCurrency): number | undefined {
   if (typeof basePrice !== 'number') return undefined;
   let p = basePrice * (1 - cond.additionalDiscountPercent / 100);
   p = p * (1 + cond.buyerCommissionPercent / 100);
-  if (cond.displayCurrency === 'uah' && cond.uahRate) p = p * cond.uahRate;
+  if (currency.displayCurrency === 'uah' && currency.uahRate) p = p * currency.uahRate;
   return Math.round(p * 100) / 100;
 }
 
 // Re-derives price/originalPrice (top-level and per-color) from basePrice/baseOriginalPrice
-// under a (possibly just-changed) set of sale conditions. Always reads from base*, never from
-// the current price/originalPrice, so repeated edits don't compound markup on top of markup.
-// Products uploaded before basePrice existed have none — for those price/originalPrice IS the
-// base (no markup was ever applied), so falling back to it is correct, not just a safe default.
-export function repriceProductData<T extends ProductData>(data: T, cond: SaleConditions): T {
+// under a (possibly just-changed) set of conditions/currency. Always reads from base*, never
+// from the current price/originalPrice, so repeated calls don't compound markup on top of
+// markup. Products uploaded before basePrice existed have none — for those price/originalPrice
+// IS the base (no markup was ever applied), so falling back to it is correct, not just a safe
+// default. Also stamps `currency` ('USD'/'UAH') so the storefront always shows the right symbol
+// next to a price, even mid-way through a global currency-switch repricing sweep where some
+// products have been updated and others haven't yet.
+export function repriceProductData<T extends ProductData>(data: T, cond: SaleConditions, currency: DisplayCurrency): T {
   const basePrice = typeof data.basePrice === 'number' ? data.basePrice : (data.price as number | undefined);
   const baseOriginalPrice =
     typeof data.baseOriginalPrice === 'number' ? data.baseOriginalPrice : (data.originalPrice as number | undefined);
@@ -103,17 +112,18 @@ export function repriceProductData<T extends ProductData>(data: T, cond: SaleCon
     ...data,
     basePrice,
     baseOriginalPrice,
-    price: applySaleMarkup(basePrice, cond),
-    originalPrice: applySaleMarkup(baseOriginalPrice, cond),
+    currency: currency.displayCurrency === 'uah' ? 'UAH' : 'USD',
+    price: applySaleMarkup(basePrice, cond, currency),
+    originalPrice: applySaleMarkup(baseOriginalPrice, cond, currency),
     colors: (data.colors ?? []).map((c) => {
       const cBasePrice = typeof c.basePrice === 'number' ? c.basePrice : (c.price as number | undefined);
       const cBaseOriginalPrice =
         typeof c.baseOriginalPrice === 'number' ? c.baseOriginalPrice : (c.originalPrice as number | undefined);
       return {
         ...c,
-        ...(cBasePrice !== undefined ? { basePrice: cBasePrice, price: applySaleMarkup(cBasePrice, cond) } : {}),
+        ...(cBasePrice !== undefined ? { basePrice: cBasePrice, price: applySaleMarkup(cBasePrice, cond, currency) } : {}),
         ...(cBaseOriginalPrice !== undefined
-          ? { baseOriginalPrice: cBaseOriginalPrice, originalPrice: applySaleMarkup(cBaseOriginalPrice, cond) }
+          ? { baseOriginalPrice: cBaseOriginalPrice, originalPrice: applySaleMarkup(cBaseOriginalPrice, cond, currency) }
           : {}),
       };
     }),

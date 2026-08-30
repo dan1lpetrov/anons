@@ -82,10 +82,10 @@ async function handleGet(req: VercelRequest, res: VercelResponse) {
     const { rows } = await db.query<BannerRow>(
       `SELECT ${SELECT_COLUMNS} FROM banners WHERE active = true ORDER BY sort_order ASC, id ASC`,
     );
-    // Short compared to /api/products' 60s — banners are now reordered casually via
-    // drag-and-drop in the admin, so a change should read back on the storefront in
-    // roughly the time it takes to alt-tab over and reload, not up to a minute.
-    res.setHeader('Cache-Control', 'public, max-age=15, stale-while-revalidate=60');
+    // No caching, unlike /api/products — an admin edit (drag reorder, pause, delete) should be
+    // visible on the storefront on the very next load, not after some TTL window. The banners
+    // table is tiny and this query is cheap, so there's no real cost to skipping the cache.
+    res.setHeader('Cache-Control', 'no-store');
     return res.status(200).json(rows);
   } catch (error) {
     console.error(error);

@@ -19,9 +19,13 @@ const PAD_TOP = 8;
 const PAD_BOTTOM = 8;
 // Each point holds its price until the next change (or, for the last point,
 // until now) — so there's one band per point, not one band per gap between
-// points. A band's natural width is fixed; only once there are enough points
-// that their bands would overflow the plot do we compress them to fit.
-const BAND_GAP = 64;
+// points. Bands always divide the internal viewBox evenly; what keeps a
+// sparse chart (few points) from reading as a few unnaturally wide plateaus
+// is that the *rendered* box itself shrinks to `bandCount * PX_PER_BAND`
+// (see chartWidthStyle below) instead of always stretching to the full card
+// width — once there's enough real history to fill that width on its own,
+// this has no effect and the chart behaves like a normal full-width chart.
+const PX_PER_BAND = 56;
 // Give the highest/lowest price some breathing room from the top/bottom edges
 // instead of the extreme dots sitting flush on the gridlines.
 const VALUE_PAD_RATIO = 0.18;
@@ -96,12 +100,14 @@ export function PriceHistoryChart({ points, currency }: PriceHistoryChartProps) 
   // tooltip/axis labels still come from the real `recordedAt`.
   //
   // There are `points.length` bands (one per point, including a trailing one
-  // for the current/latest price), so the natural width is measured in bands,
-  // not gaps-between-points.
+  // for the current/latest price), evenly dividing the internal viewBox —
+  // the box's actual rendered width (chartWidthStyle) is what controls
+  // whether that reads as compact or full-width, not this internal math.
   const bandCount = points.length;
-  const gap = bandCount * BAND_GAP <= plotWidth ? BAND_GAP : plotWidth / bandCount;
+  const gap = plotWidth / bandCount;
   const coords = points.map((p, i) => ({ ...p, x: PAD_X + i * gap, y: yFor(p.price) }));
   const virtualEndX = PAD_X + bandCount * gap;
+  const chartWidthStyle = `min(${bandCount * PX_PER_BAND}px, 100%)`;
 
   // The dot marker sits in the middle of the flat band it represents (from
   // its own transition to the next one, or — for the last point — to the
@@ -142,7 +148,7 @@ export function PriceHistoryChart({ points, currency }: PriceHistoryChartProps) 
       <p className="price-history__label">Історія ціни</p>
       <div className="price-history__chart-wrap">
         <span className="price-history__gridlabel">{formatPrice(max, currency)}</span>
-        <div className="price-history__plot" style={{ height: HEIGHT }}>
+        <div className="price-history__plot" style={{ height: HEIGHT, width: chartWidthStyle }}>
           <svg
             className="price-history__chart"
             viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
@@ -186,7 +192,7 @@ export function PriceHistoryChart({ points, currency }: PriceHistoryChartProps) 
         </div>
         <span className="price-history__gridlabel">{formatPrice(min, currency)}</span>
       </div>
-      <div className="price-history__axis">
+      <div className="price-history__axis" style={{ width: chartWidthStyle }}>
         {coords.map((c, i) => {
           // The synthetic "original price" point has no real recorded date —
           // showing the literal fallback text ("було") as an axis label reads

@@ -24,44 +24,14 @@
 <div id="app" class="admin-shell hidden">
   <div id="nav"></div>
   <main class="admin-content">
-    <div class="admin-content__inner">
+    <div class="admin-content__inner admin-content__inner--medium">
       <div class="row" style="justify-content: space-between;">
         <h1>Розпродажі</h1>
         <a class="button primary" href="/admin/upload">+ Додати розпродаж</a>
       </div>
 
-      <section class="currency-section">
-        <h2>Валюта показу на сайті</h2>
-        <p class="hint">Спільна для всього сайту, не залежить від розпродажу. Комісія й знижка лишаються окремо для кожної кампанії нижче.</p>
-        <div class="field-grid">
-          <div class="field">
-            <label>Валюта показу</label>
-            <select id="currencySelect">
-              <option value="original">Оригінальна (USD)</option>
-              <option value="uah">Гривня (за курсом банку)</option>
-            </select>
-          </div>
-          <div class="field" id="bankField">
-            <label>Банк</label>
-            <select id="bankSelect">
-              <option value="mono">Monobank</option>
-              <option value="privat">ПриватБанк</option>
-              <option value="">Власний курс</option>
-            </select>
-          </div>
-          <div class="field field-span-2" id="rateField">
-            <label>Курс, ₴ за $1</label>
-            <div class="rate-row">
-              <input type="number" step="0.0001" min="0" id="rateInput" placeholder="напр. 41.5" />
-              <button id="refreshRateBtn" class="secondary" type="button">Оновити курс</button>
-            </div>
-          </div>
-        </div>
-        <div class="currency-footer">
-          <span id="currencyStatus" class="status"></span>
-          <button id="saveCurrency" class="primary" type="button">Зберегти валюту (перерахує ціни всіх товарів)</button>
-        </div>
-      </section>
+      <section class="sale-card" id="currencyCard"></section>
+      <div id="currencyStatus" class="status"></div>
 
       <section class="section-plain">
         <div class="row" style="justify-content: space-between;">
@@ -339,98 +309,166 @@
   reloadSalesBtn.addEventListener('click', loadSales);
 
   // --- Site-wide display currency (see api/_lib/siteSettings.ts) ---
-  const currencySelect = document.getElementById('currencySelect');
-  const bankSelect = document.getElementById('bankSelect');
-  const bankField = document.getElementById('bankField');
-  const rateField = document.getElementById('rateField');
-  const rateInput = document.getElementById('rateInput');
-  const refreshRateBtn = document.getElementById('refreshRateBtn');
-  const saveCurrencyBtn = document.getElementById('saveCurrency');
+  // Rarely touched, so it's shown read-only (name + a one-line summary of the current
+  // setting) with a single Edit action, same collapsed/expanded pattern as a sale card.
+  const currencyCard = document.getElementById('currencyCard');
   const currencyStatus = document.getElementById('currencyStatus');
 
-  function updateCurrencyVisibility() {
-    const isUah = currencySelect.value === 'uah';
-    bankField.classList.toggle('hidden', !isUah);
-    rateField.classList.toggle('hidden', !isUah);
-    const isNamedBank = NAMED_BANKS.has(bankSelect.value);
-    refreshRateBtn.classList.toggle('hidden', !isNamedBank);
-    // Named banks always fetch fresh at save time — this field can only preview, not commit,
-    // a value for them. Custom is the opposite: always the admin's own typed number.
-    rateInput.disabled = isNamedBank;
-    rateInput.placeholder = isNamedBank ? 'отримується автоматично при збереженні' : 'напр. 41.5';
+  function bankLabel(bank) {
+    if (bank === 'mono') return 'Monobank';
+    if (bank === 'privat') return 'ПриватБанк';
+    return 'Власний курс';
   }
-  currencySelect.addEventListener('change', updateCurrencyVisibility);
-  bankSelect.addEventListener('change', updateCurrencyVisibility);
-  updateCurrencyVisibility();
 
-  // Preview-only for mono/privat — saving always re-fetches a fresh rate at that moment
-  // regardless of what's shown here (see api/sales.ts's resolveSiteCurrency), so this button
-  // just lets the admin see roughly what they're about to commit the whole site's prices to.
-  refreshRateBtn.addEventListener('click', async () => {
-    refreshRateBtn.disabled = true;
-    try {
-      const res = await fetch(`/api/sales?fetchRate=${encodeURIComponent(bankSelect.value)}`, {
-        cache: 'no-store',
-        credentials: 'include',
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-      rateInput.value = body.rate;
-    } catch (err) {
-      AdminShared.setStatus(currencyStatus, 'err', 'Помилка: ' + err.message);
-    } finally {
-      refreshRateBtn.disabled = false;
+  function currencySubtitle(state) {
+    if (state.displayCurrency !== 'uah') return 'Оригінальна (USD)';
+    const rate = state.uahRate ? `курс ${Number(state.uahRate).toLocaleString('uk-UA')} ₴ за $1` : 'курс не задано';
+    return `Гривня · ${bankLabel(state.uahBank)} · ${rate}`;
+  }
+
+  function renderCurrencyCard(state) {
+    currencyCard.className = 'sale-card';
+    currencyCard.innerHTML = `
+      <div class="sale-card__row">
+        <div class="sale-card__identity">
+          <span class="sale-card__name">Валюта показу на сайті</span>
+          <span class="sale-card__subtitle">${currencySubtitle(state)}</span>
+        </div>
+        <div class="sale-card__actions">
+          <button type="button" class="icon-btn edit-toggle" title="Редагувати">${AdminShared.icon('pencil', 14)}</button>
+        </div>
+      </div>
+      <div class="sale-card__panel sale-card__edit">
+        <p class="sale-card__hint">Спільна для всього сайту, не залежить від розпродажу. Комісія й знижка лишаються окремо для кожної кампанії нижче.</p>
+        <div class="field-grid sale-form-grid">
+          <div class="field">
+            <label>Валюта показу</label>
+            <select class="f-currency">
+              <option value="original">Оригінальна (USD)</option>
+              <option value="uah">Гривня (за курсом банку)</option>
+            </select>
+          </div>
+          <div class="field bank-field">
+            <label>Банк</label>
+            <select class="f-bank">
+              <option value="mono">Monobank</option>
+              <option value="privat">ПриватБанк</option>
+              <option value="">Власний курс</option>
+            </select>
+          </div>
+          <div class="field field-span-2 rate-field">
+            <label>Курс, ₴ за $1</label>
+            <div class="rate-row">
+              <input type="number" step="0.0001" min="0" class="f-rate" placeholder="напр. 41.5" />
+              <button type="button" class="secondary refresh-rate-btn">Оновити курс</button>
+            </div>
+          </div>
+        </div>
+        <div class="sale-form-footer">
+          <button type="button" class="secondary cancel-currency-btn">Скасувати</button>
+          <button type="button" class="primary save-currency-btn">Зберегти</button>
+        </div>
+      </div>
+    `;
+
+    const editBtn = currencyCard.querySelector('.edit-toggle');
+    const cancelBtn = currencyCard.querySelector('.cancel-currency-btn');
+    const saveBtn = currencyCard.querySelector('.save-currency-btn');
+    const currencySelect = currencyCard.querySelector('.f-currency');
+    const bankSelect = currencyCard.querySelector('.f-bank');
+    const bankField = currencyCard.querySelector('.bank-field');
+    const rateField = currencyCard.querySelector('.rate-field');
+    const rateInput = currencyCard.querySelector('.f-rate');
+    const refreshRateBtn = currencyCard.querySelector('.refresh-rate-btn');
+
+    currencySelect.value = state.displayCurrency;
+    bankSelect.value = state.uahBank || '';
+    if (state.uahRate) rateInput.value = state.uahRate;
+
+    function updateVisibility() {
+      const isUah = currencySelect.value === 'uah';
+      bankField.classList.toggle('hidden', !isUah);
+      rateField.classList.toggle('hidden', !isUah);
+      const isNamedBank = NAMED_BANKS.has(bankSelect.value);
+      refreshRateBtn.classList.toggle('hidden', !isNamedBank);
+      // Named banks always fetch fresh at save time — this field can only preview, not commit,
+      // a value for them. Custom is the opposite: always the admin's own typed number.
+      rateInput.disabled = isNamedBank;
+      rateInput.placeholder = isNamedBank ? 'отримується автоматично при збереженні' : 'напр. 41.5';
     }
-  });
+    currencySelect.addEventListener('change', updateVisibility);
+    bankSelect.addEventListener('change', updateVisibility);
+    updateVisibility();
+
+    editBtn.addEventListener('click', () => currencyCard.classList.add('is-editing'));
+    cancelBtn.addEventListener('click', () => renderCurrencyCard(state));
+
+    // Preview-only for mono/privat — saving always re-fetches a fresh rate at that moment
+    // regardless of what's shown here (see api/sales.ts's resolveSiteCurrency), so this button
+    // just lets the admin see roughly what they're about to commit the whole site's prices to.
+    refreshRateBtn.addEventListener('click', async () => {
+      refreshRateBtn.disabled = true;
+      try {
+        const res = await fetch(`/api/sales?fetchRate=${encodeURIComponent(bankSelect.value)}`, {
+          cache: 'no-store',
+          credentials: 'include',
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+        rateInput.value = body.rate;
+      } catch (err) {
+        AdminShared.setStatus(currencyStatus, 'err', 'Помилка: ' + err.message);
+      } finally {
+        refreshRateBtn.disabled = false;
+      }
+    });
+
+    saveBtn.addEventListener('click', async () => {
+      const payload = { global: true, displayCurrency: currencySelect.value };
+      if (currencySelect.value === 'uah') {
+        if (NAMED_BANKS.has(bankSelect.value)) {
+          payload.uahBank = bankSelect.value;
+        } else {
+          payload.uahBank = null;
+          payload.uahRate = Number(rateInput.value);
+        }
+      }
+      saveBtn.disabled = true;
+      AdminShared.setStatus(currencyStatus, 'pending', 'Зберігаю валюту й перераховую ціни всіх товарів...');
+      try {
+        const res = await fetch('/api/sales', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+        AdminShared.setStatus(currencyStatus, 'ok', `Збережено. Перераховано цін: ${body.repricedCount ?? 0}.`);
+        renderCurrencyCard({
+          displayCurrency: payload.displayCurrency,
+          uahBank: payload.uahBank ?? null,
+          uahRate: body.uahRate ?? payload.uahRate ?? null,
+        });
+      } catch (err) {
+        AdminShared.setStatus(currencyStatus, 'err', 'Помилка: ' + err.message);
+        saveBtn.disabled = false;
+      }
+    });
+  }
 
   async function loadCurrency() {
-    AdminShared.setStatus(currencyStatus, 'pending', 'Завантаження...');
     try {
       const res = await fetch('/api/sales?global=1', { cache: 'no-store', credentials: 'include' });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `HTTP ${res.status}`);
       }
-      const currency = await res.json();
-      currencySelect.value = currency.displayCurrency;
-      bankSelect.value = currency.uahBank || '';
-      if (currency.uahRate) rateInput.value = currency.uahRate;
-      updateCurrencyVisibility();
-      currencyStatus.className = 'status';
+      renderCurrencyCard(await res.json());
     } catch (err) {
       AdminShared.setStatus(currencyStatus, 'err', 'Помилка: ' + err.message);
     }
   }
-
-  saveCurrencyBtn.addEventListener('click', async () => {
-    const payload = { global: true, displayCurrency: currencySelect.value };
-    if (currencySelect.value === 'uah') {
-      if (NAMED_BANKS.has(bankSelect.value)) {
-        payload.uahBank = bankSelect.value;
-      } else {
-        payload.uahBank = null;
-        payload.uahRate = Number(rateInput.value);
-      }
-    }
-    saveCurrencyBtn.disabled = true;
-    AdminShared.setStatus(currencyStatus, 'pending', 'Зберігаю валюту й перераховую ціни всіх товарів...');
-    try {
-      const res = await fetch('/api/sales', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-      AdminShared.setStatus(currencyStatus, 'ok', `Збережено. Перераховано цін: ${body.repricedCount ?? 0}.`);
-      if (body.uahRate) rateInput.value = body.uahRate;
-    } catch (err) {
-      AdminShared.setStatus(currencyStatus, 'err', 'Помилка: ' + err.message);
-    } finally {
-      saveCurrencyBtn.disabled = false;
-    }
-  });
 
   AdminShared.init('sales').then((email) => {
     if (email) {

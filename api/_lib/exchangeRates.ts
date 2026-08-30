@@ -1,12 +1,12 @@
 // Fetches a USD→UAH rate for the site-wide display currency setting (api/_lib/siteSettings.ts).
-// Only mono/privat have documented, no-auth public JSON APIs — pumb/sens don't, so those two
-// require the admin to type the rate in by hand (see api/sales.ts's `global=1` branch).
-export const UAH_BANKS = ['mono', 'privat', 'pumb', 'sens'] as const;
-export type UahBank = (typeof UAH_BANKS)[number];
-export type AutoRateBank = 'mono' | 'privat';
-export const AUTO_RATE_BANKS = new Set<UahBank>(['mono', 'privat']);
+// Only mono/privat have documented, no-auth public JSON APIs — a third "власний курс" (custom)
+// option covers any other bank, always as an admin-typed number (see api/sales.ts's
+// resolveSiteCurrency: named banks always re-fetch fresh at save time, custom always requires
+// a manually entered rate — neither ever falls back to the other's behavior).
+export const NAMED_BANKS = ['mono', 'privat'] as const;
+export type NamedBank = (typeof NAMED_BANKS)[number];
 
-export async function fetchUsdUahRate(bank: AutoRateBank): Promise<number> {
+export async function fetchUsdUahRate(bank: NamedBank): Promise<number> {
   if (bank === 'mono') return fetchMonoRate();
   return fetchPrivatRate();
 }

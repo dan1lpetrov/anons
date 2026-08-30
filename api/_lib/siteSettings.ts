@@ -1,5 +1,5 @@
 import { db } from './db.js';
-import type { UahBank } from './exchangeRates.js';
+import { NAMED_BANKS, type NamedBank } from './exchangeRates.js';
 
 // Site-wide display currency — applies to every product on the storefront regardless of which
 // sale campaign it's in. Unlike buyer commission / additional discount (still per-campaign, see
@@ -7,7 +7,9 @@ import type { UahBank } from './exchangeRates.js';
 // catalog can't sensibly see some products priced in $ and others in ₴ side by side.
 export interface SiteCurrency {
   displayCurrency: 'original' | 'uah';
-  uahBank: UahBank | null;
+  // null = "власний курс" (custom) — uahRate is always admin-typed for that case. mono/privat
+  // always re-fetch a fresh rate at save time instead (see api/sales.ts's resolveSiteCurrency).
+  uahBank: NamedBank | null;
   uahRate: number | null;
 }
 
@@ -23,9 +25,12 @@ export async function getSiteCurrency(): Promise<SiteCurrency> {
   );
   const row = rows[0];
   if (!row) return DEFAULT_SITE_CURRENCY;
+  // A row saved before named banks narrowed to just mono/privat (e.g. the old pumb/sens
+  // options) falls back to "власний курс" (null) rather than an invalid NamedBank value.
+  const uahBank = NAMED_BANKS.includes(row.uah_bank as NamedBank) ? (row.uah_bank as NamedBank) : null;
   return {
     displayCurrency: row.display_currency === 'uah' ? 'uah' : 'original',
-    uahBank: (row.uah_bank as UahBank | null) ?? null,
+    uahBank,
     uahRate: row.uah_rate === null ? null : Number(row.uah_rate),
   };
 }

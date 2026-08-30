@@ -99,10 +99,15 @@ async function handlePost(req: VercelRequest, res: VercelResponse) {
     const currency = await getSiteCurrency();
     const priced: (ProductData & Record<string, unknown>)[] = products.map((p) => repriceProductData(p, conditions, currency));
 
+    // price_history tracks basePrice × (1 − discount%) × (1 + commission%) — before FX
+    // conversion — so a currency/rate change never counts as a "price change" for history (see
+    // the matching NO_FX note in api/sales.ts's repriceProducts).
+    const historyPriced = products.map((p) => repriceProductData(p, conditions, { displayCurrency: 'original', uahRate: null }));
+
     await client.query('BEGIN');
     await recordPriceChanges(
       client,
-      priced.map((p) => ({ id: p.id as string, price: p.price as number, colors: p.colors ?? [] })),
+      historyPriced.map((p) => ({ id: p.id as string, price: p.price as number, colors: p.colors ?? [] })),
     );
 
     // Never truncates or deletes — a product is inserted if it's new to this campaign, or its

@@ -2,8 +2,14 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type { VercelPoolClient } from '@vercel/postgres';
 import { db, ensureSchema } from './_lib/db.js';
 import { requireAdmin } from './_lib/session.js';
-import { fetchUsdUahRate, UAH_BANKS, AUTO_RATE_BANKS, type UahBank, type AutoRateBank } from './_lib/exchangeRates.js';
-import { recordPriceChanges, repriceProductData, type ProductData, type SaleConditions } from './_lib/pricing.js';
+import { fetchUsdUahRate, NAMED_BANKS, type NamedBank } from './_lib/exchangeRates.js';
+import {
+  recordPriceChanges,
+  repriceProductData,
+  type DisplayCurrency,
+  type ProductData,
+  type SaleConditions,
+} from './_lib/pricing.js';
 import { getSiteCurrency, setSiteCurrency, type SiteCurrency } from './_lib/siteSettings.js';
 
 // Mirrors the SaleId brand enum from src/types (see CLAUDE.md's "saleId is a closed brand
@@ -42,11 +48,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 async function handleGet(req: VercelRequest, res: VercelResponse) {
   const fetchRate = req.query.fetchRate;
   if (typeof fetchRate === 'string') {
-    if (!AUTO_RATE_BANKS.has(fetchRate as UahBank)) {
-      return res.status(400).json({ error: `fetchRate підтримує лише: ${[...AUTO_RATE_BANKS].join(', ')}` });
+    if (!NAMED_BANKS.includes(fetchRate as NamedBank)) {
+      return res.status(400).json({ error: `fetchRate підтримує лише: ${NAMED_BANKS.join(', ')}` });
     }
     try {
-      const rate = await fetchUsdUahRate(fetchRate as AutoRateBank);
+      const rate = await fetchUsdUahRate(fetchRate as NamedBank);
       return res.status(200).json({ rate });
     } catch (error) {
       console.error(error);
@@ -118,8 +124,12 @@ function resolveConditions(body: Record<string, unknown>): ResolveResult<SaleCon
   return { ok: true, value: { buyerCommissionPercent: commission, additionalDiscountPercent: discount } };
 }
 
-// Shared by the global-currency GET/POST branch — resolves+validates a target SiteCurrency,
-// auto-fetching the rate for mono/privat when the admin didn't type one in.
+// Shared by the global-currency GET/POST branch — resolves+validates a target SiteCurrency.
+// Named banks (mono/privat) always re-fetch a fresh rate right now, ignoring anything the client
+// sent for uahRate — the whole point is "post/save with the actual current rate," not whatever
+// was showing in a form that might be minutes stale by the time it's submitted. uahBank absent
+// or null means "власний курс" (custom), which is the opposite: always the admin-typed number,
+// never auto-fetched.
 async function resolveSiteCurrency(body: Record<string, unknown>): Promise<ResolveResult<SiteCurrency>> {
   const { displayCurrency, uahBank, uahRate } = body;
 
@@ -131,35 +141,40 @@ async function resolveSiteCurrency(body: Record<string, unknown>): Promise<Resol
     return { ok: true, value: { displayCurrency: 'original', uahBank: null, uahRate: null } };
   }
 
-  if (!UAH_BANKS.includes(uahBank as UahBank)) {
-    return { ok: false, status: 400, error: `uahBank має бути одним з: ${UAH_BANKS.join(', ')}` };
+  if (uahBank !== null && uahBank !== undefined && !NAMED_BANKS.includes(uahBank as NamedBank)) {
+    return { ok: false, status: 400, error: `uahBank має бути одним з: ${NAMED_BANKS.join(', ')}, або не вказаний (власний курс)` };
   }
-  const bank = uahBank as UahBank;
 
-  if (uahRate !== undefined && uahRate !== null) {
+  if (uahBank === null || uahBank === undefined) {
     const manualRate = Number(uahRate);
     if (!Number.isFinite(manualRate) || manualRate <= 0) {
-      return { ok: false, status: 400, error: 'uahRate має бути додатним числом' };
+      return { ok: false, status: 400, error: 'Для власного курсу треба вказати додатне число' };
     }
-    return { ok: true, value: { displayCurrency: 'uah', uahBank: bank, uahRate: manualRate } };
+    return { ok: true, value: { displayCurrency: 'uah', uahBank: null, uahRate: manualRate } };
   }
-  if (!AUTO_RATE_BANKS.has(bank)) {
-    return { ok: false, status: 400, error: `Для банку ${bank} немає публічного API курсів — введи курс вручну.` };
-  }
+
+  const bank = uahBank as NamedBank;
   try {
-    const rate = await fetchUsdUahRate(bank as AutoRateBank);
+    const rate = await fetchUsdUahRate(bank);
     return { ok: true, value: { displayCurrency: 'uah', uahBank: bank, uahRate: rate } };
   } catch (error) {
     console.error(error);
-    return { ok: false, status: 502, error: `Не вдалося отримати курс ${bank}. Спробуй ще раз або введи курс вручну.` };
+    return { ok: false, status: 502, error: `Не вдалося отримати курс ${bank}. Спробуй ще раз.` };
   }
 }
+
+// price_history tracks basePrice × (1 − discount%) × (1 + commission%) — the price *before* FX
+// conversion — never the currency-converted display price. A USD/UAH rate can move on its own
+// (see fetchUsdUahRate) independently of anything actually changing about the product or the
+// deal, and re-logging every product's history on every rate tick is exactly the noise this
+// avoids: history only grows when basePrice or the campaign's discount/commission actually move.
+const NO_FX: DisplayCurrency = { displayCurrency: 'original', uahRate: null };
 
 // Re-derives price/originalPrice for a set of products from their stored basePrice/
 // baseOriginalPrice, under a (possibly just-changed) set of per-product conditions — shared by
 // the per-campaign edit path (one sale's commission/discount changed) and the global-currency
 // sweep (every product's display currency changed, each keeping its own campaign's commission/
-// discount). Both write price_history so the ranking cron's history signal sees every change.
+// discount). Only writes price_history when the pre-FX price actually changed (see NO_FX above).
 async function repriceProducts(
   client: VercelPoolClient,
   rows: Array<{ id: string; saleEventId: number; data: ProductData; conditions: SaleConditions }>,
@@ -171,14 +186,15 @@ async function repriceProducts(
     id: r.id,
     saleEventId: r.saleEventId,
     data: repriceProductData(r.data, r.conditions, currency),
+    historyData: repriceProductData(r.data, r.conditions, NO_FX),
   }));
 
   await recordPriceChanges(
     client,
     repriced.map((r) => ({
       id: r.id,
-      price: r.data.price as number,
-      colors: r.data.colors ?? [],
+      price: r.historyData.price as number,
+      colors: r.historyData.colors ?? [],
     })),
   );
 

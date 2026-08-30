@@ -69,8 +69,7 @@
     token_exchange_failed: 'Не вдалося завершити вхід через Google.',
   };
 
-  const MANUAL_RATE_BANKS = new Set(['pumb', 'sens']);
-  const AUTO_RATE_BANKS = new Set(['mono', 'privat']);
+  const NAMED_BANKS = new Set(['mono', 'privat']);
 
   (function showLoginError() {
     const params = new URLSearchParams(location.search);
@@ -241,10 +240,9 @@
 
     const bankSelect = document.createElement('select');
     bankSelect.innerHTML = `
-      <option value="mono">Monobank (курс — автоматично)</option>
-      <option value="privat">ПриватБанк (курс — автоматично)</option>
-      <option value="pumb">ПУМБ (курс — вручну)</option>
-      <option value="sens">Sense Bank (курс — вручну)</option>
+      <option value="mono">Monobank</option>
+      <option value="privat">ПриватБанк</option>
+      <option value="">Власний курс</option>
     `;
 
     const rateInput = document.createElement('input');
@@ -253,10 +251,13 @@
     rateInput.min = '0';
     rateInput.placeholder = 'напр. 41.5';
 
+    // Preview-only for mono/privat — saving always re-fetches a fresh rate at that moment
+    // regardless of what's shown here (see api/sales.ts's resolveSiteCurrency), so this button
+    // just lets the admin see roughly what they're about to commit the whole site's prices to.
     const refreshRateBtn = document.createElement('button');
     refreshRateBtn.type = 'button';
     refreshRateBtn.className = 'secondary';
-    refreshRateBtn.textContent = 'Оновити курс';
+    refreshRateBtn.textContent = 'Показати поточний курс';
     refreshRateBtn.addEventListener('click', async () => {
       refreshRateBtn.disabled = true;
       try {
@@ -288,11 +289,16 @@
 
     function updateVisibility() {
       const isUah = currencySelect.value === 'uah';
+      const isNamedBank = NAMED_BANKS.has(bankSelect.value);
       bankLabel.classList.toggle('hidden', !isUah);
       bankSelect.classList.toggle('hidden', !isUah);
       rateLabel.classList.toggle('hidden', !isUah);
       rateRow.classList.toggle('hidden', !isUah);
-      refreshRateBtn.classList.toggle('hidden', !AUTO_RATE_BANKS.has(bankSelect.value));
+      refreshRateBtn.classList.toggle('hidden', !isNamedBank);
+      // Named banks always fetch fresh at save time — this field can only preview, not commit,
+      // a value for them. Custom is the opposite: always the admin's own typed number.
+      rateInput.disabled = isNamedBank;
+      rateInput.placeholder = isNamedBank ? 'отримується автоматично при збереженні' : 'напр. 41.5';
     }
     currencySelect.addEventListener('change', updateVisibility);
     bankSelect.addEventListener('change', updateVisibility);
@@ -318,7 +324,7 @@
       const currency = await res.json();
       if (!currencyInputs) buildCurrencyEditor();
       currencyInputs.currencySelect.value = currency.displayCurrency;
-      currencyInputs.bankSelect.value = currency.uahBank || 'mono';
+      currencyInputs.bankSelect.value = currency.uahBank || '';
       if (currency.uahRate) currencyInputs.rateInput.value = currency.uahRate;
       currencyInputs.currencySelect.dispatchEvent(new Event('change'));
       currencyStatus.className = 'status';
@@ -332,8 +338,13 @@
     const { currencySelect, bankSelect, rateInput } = currencyInputs;
     const payload = { global: true, displayCurrency: currencySelect.value };
     if (currencySelect.value === 'uah') {
-      payload.uahBank = bankSelect.value;
-      if (MANUAL_RATE_BANKS.has(bankSelect.value) || rateInput.value) {
+      // Named banks: send no uahBank/uahRate override — the server always fetches a fresh rate
+      // itself at save time (see resolveSiteCurrency). Custom (bankSelect.value === ''): send
+      // uahBank as null and the admin's typed rate, which the server always trusts as-is.
+      if (NAMED_BANKS.has(bankSelect.value)) {
+        payload.uahBank = bankSelect.value;
+      } else {
+        payload.uahBank = null;
         payload.uahRate = Number(rateInput.value);
       }
     }

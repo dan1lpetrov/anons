@@ -1,9 +1,19 @@
-import { db } from '@vercel/postgres';
+import { db, type VercelPoolClient } from '@vercel/postgres';
 
 let schemaReady: Promise<void> | null = null;
 
 // Arbitrary constant used only as a lock key — see the advisory-lock note below.
 const SCHEMA_LOCK_KEY = 84237551;
+
+// Bump this by 1 every time you add a new CREATE TABLE/INDEX or ALTER TABLE statement below.
+// The fast path in runEnsureSchema() compares this against the value stored in Postgres and
+// skips the entire DDL block below when they already match — so a statement added without
+// bumping this constant will never run on any container that already has an up-to-date
+// schema_meta row (which, days after the deploy, is nearly all of them). That's not a loud
+// error — it's a column/table that silently doesn't exist until the next redeploy, so the
+// first sign of it is a query failing against it. Bumping this is the whole point of the
+// fast path existing, not an optional step.
+const SCHEMA_VERSION = 1;
 
 export async function ensureSchema(): Promise<void> {
   if (!schemaReady) {
@@ -18,9 +28,26 @@ export async function ensureSchema(): Promise<void> {
   return schemaReady;
 }
 
+async function currentSchemaVersion(client: VercelPoolClient): Promise<number> {
+  // schema_meta itself may not exist yet (pre-this-change databases, or a fresh one) — that's
+  // not a real error, just "definitely needs the full migration below".
+  return client
+    .query<{ version: number }>('SELECT version FROM schema_meta WHERE id = 1')
+    .then((r) => r.rows[0]?.version ?? 0)
+    .catch(() => 0);
+}
+
 async function runEnsureSchema(): Promise<void> {
   const client = await db.connect();
   try {
+    // Fast path: every cold serverless container calls ensureSchema() on its first request, and
+    // each api/*.ts file is its own separate Vercel function with its own separate cold starts —
+    // so without this check, every one of them independently pays the full ~25-round-trip DDL
+    // chain below on every cold start, even though it's a no-op almost every time (the schema
+    // only actually changes right after a deploy that adds a new migration statement). One cheap
+    // SELECT here replaces that in the common case.
+    if ((await currentSchemaVersion(client)) === SCHEMA_VERSION) return;
+
     // Every cold serverless instance calls this on its first request, so right after a deploy
     // many of them race to run the DDL below concurrently. `CREATE TABLE/INDEX IF NOT EXISTS`
     // is NOT atomic across concurrent transactions — two can both see "doesn't exist yet" and
@@ -29,6 +56,10 @@ async function runEnsureSchema(): Promise<void> {
     // attempts: whoever loses the race just finds everything already created and does nothing.
     await client.query('SELECT pg_advisory_lock($1)', [SCHEMA_LOCK_KEY]);
     try {
+      // Re-check after acquiring the lock — another container may have already finished the
+      // migration and updated schema_meta while we were waiting for the lock.
+      if ((await currentSchemaVersion(client)) === SCHEMA_VERSION) return;
+
       await client.query(`
         CREATE TABLE IF NOT EXISTS products (
           id TEXT PRIMARY KEY,
@@ -201,6 +232,21 @@ async function runEnsureSchema(): Promise<void> {
           CHECK (id = 1)
         );
       `);
+
+      // Marks the DDL above as done up to SCHEMA_VERSION so the fast path above can skip it on
+      // every future cold start until that constant is bumped again.
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS schema_meta (
+          id INTEGER PRIMARY KEY DEFAULT 1,
+          version INTEGER NOT NULL,
+          CHECK (id = 1)
+        );
+      `);
+      await client.query(
+        `INSERT INTO schema_meta (id, version) VALUES (1, $1)
+         ON CONFLICT (id) DO UPDATE SET version = EXCLUDED.version`,
+        [SCHEMA_VERSION],
+      );
     } finally {
       await client.query('SELECT pg_advisory_unlock($1)', [SCHEMA_LOCK_KEY]);
     }

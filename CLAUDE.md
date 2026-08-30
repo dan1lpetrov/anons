@@ -42,6 +42,12 @@ Single-admin Google OAuth, not multi-user auth: `api/auth/login.ts` redirects to
 
 Required env vars: `SESSION_SECRET`, `ADMIN_EMAIL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `CRON_SECRET` (gates `/api/cron/recompute-scores` — Vercel sends it as `Authorization: Bearer $CRON_SECRET` automatically for its own Cron invocations when this var is set; without it the cron route falls back to admin-session auth only, so Vercel Cron calls will 401), plus whatever Postgres connection vars `@vercel/postgres` expects (auto-populated by the Vercel Postgres integration).
 
+### Database schema / migrations (`api/_lib/db.ts`)
+
+Every table/column is created lazily by `ensureSchema()` — no separate migration tool or deploy step; each `api/*.ts` handler just calls `await ensureSchema()` before touching the DB, and the `CREATE TABLE/INDEX IF NOT EXISTS` / `ALTER TABLE ADD COLUMN IF NOT EXISTS` statements make re-running the whole block harmless. This is the only place table/column definitions live — add a field there, not in a separate migration file.
+
+**`SCHEMA_VERSION` MUST be bumped by 1 in the same change as any new `CREATE TABLE`/`CREATE INDEX`/`ALTER TABLE` statement added to `runEnsureSchema()`.** A fast path compares this constant against a `version` value stored in Postgres (`schema_meta` table) and returns immediately, skipping the entire DDL block, whenever they already match — because each `api/*.ts` file is its own separate Vercel function with its own separate cold starts, and running ~25 sequential DDL round-trips on every one of them independently used to cost several real seconds of page-load latency (this is what the fast path exists to avoid). Forgetting to bump the constant means the new statement silently never executes on any container that already has an up-to-date `schema_meta` row — which, days after the deploy, is nearly all of them — so the failure mode isn't a build error, it's a column/table that doesn't exist until someone notices a query failing against it.
+
 ### Sales lifecycle
 
 A "sale" (`sale_windows` table) is a per-`saleId` row with `end_date`/`active`. Products past their sale's `end_date` are excluded by `GET /api/products`'s `WHERE` clause. The admin panel can pause a sale (`active: false`, keeps data) or fully delete one (`DELETE /api/sales?saleId=...`, removes both the `sale_windows` row and every product with that `sale_id` — irreversible).

@@ -534,9 +534,19 @@ code {
 
 .item-list { display: flex; flex-direction: column; gap: 8px; }
 
-section.item-card { padding: 0; gap: 0; transition: border-color 0.15s ease; }
-section.item-card.is-editing { border-color: rgba(var(--accent-rgb), 0.4); }
-section.item-card.is-confirming { border-color: rgba(var(--danger-rgb), 0.4); }
+.item-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  padding: 0;
+  gap: 0;
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.15s ease;
+}
+.item-card.is-editing { border-color: rgba(var(--accent-rgb), 0.4); }
+.item-card.is-confirming { border-color: rgba(var(--danger-rgb), 0.4); }
 
 .item-card__row { display: flex; align-items: center; gap: 14px; padding: 14px 16px; }
 
@@ -577,8 +587,8 @@ button.icon-btn.danger:hover { background: var(--danger-bg); color: var(--danger
 button.icon-btn.is-active { background: rgba(var(--accent-rgb), 0.1); color: var(--accent); border-color: transparent; }
 
 .item-card__panel { display: none; border-top: 1px solid var(--border); padding: 16px; }
-section.item-card.is-editing .item-card__edit { display: block; }
-section.item-card.is-confirming .item-card__confirm { display: flex; }
+.item-card.is-editing .item-card__edit { display: block; }
+.item-card.is-confirming .item-card__confirm { display: flex; }
 
 .item-form-grid { margin-bottom: 16px; }
 .item-form-footer {

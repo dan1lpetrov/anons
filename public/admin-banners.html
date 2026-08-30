@@ -251,9 +251,11 @@
 
   // Per-card dragover/drop (in wireDrag) only fires while the pointer is over a card's own box,
   // and stops there via stopPropagation. Dragging past the top of the first card or below the
-  // bottom of the last one lands the pointer over empty list space that no card covers — this
-  // container-level listener is the catch-all for that empty space.
-  bannerList.addEventListener('dragover', (e) => {
+  // bottom of the last one puts the pointer over empty space outside #bannerList entirely (the
+  // page header, the hint text, blank space below the list, ...) — a listener on #bannerList
+  // itself would miss that, since dragover only fires on whatever element is actually under the
+  // pointer. Listening on the document catches it no matter how far the pointer strays.
+  document.addEventListener('dragover', (e) => {
     if (draggedIndex === null) return;
     e.preventDefault();
     const cards = [...bannerList.querySelectorAll('.item-card:not([data-new])')];
@@ -270,7 +272,7 @@
       bannerList.appendChild(dropIndicator());
     }
   });
-  bannerList.addEventListener('drop', (e) => {
+  document.addEventListener('drop', (e) => {
     if (draggedIndex === null) return;
     e.preventDefault();
     finishDrag();
@@ -335,7 +337,7 @@
 
   function buildBannerCard(b, index, isNew) {
     const card = document.createElement('div');
-    card.className = 'item-card card';
+    card.className = 'item-card';
     if (isNew) card.dataset.new = 'true'; // excluded from drag targeting — it isn't in `banners` yet
     card.innerHTML = `
       <div class="item-card__row">

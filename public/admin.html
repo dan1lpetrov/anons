@@ -134,7 +134,9 @@
   let currentCurrencySymbol = '$';
 
   function fmtMoney(n) {
-    return currentCurrencySymbol === '₴' ? fmtNum(n) + ' ₴' : '$' + fmtNum(n);
+    // UAH is shown without kopecks and without a comma thousands separator (uk-UA locale uses a
+    // space) — matches formatPrice() on the storefront. USD keeps the en-US comma grouping.
+    return currentCurrencySymbol === '₴' ? Math.round(n).toLocaleString('uk-UA') + ' ₴' : '$' + fmtNum(n);
   }
 
   function deltaBadge(deltaPct) {

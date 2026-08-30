@@ -7,6 +7,12 @@ function currencySymbol(currency?: 'USD' | 'UAH'): string {
   return currency === 'UAH' ? '₴' : '$';
 }
 
+// UAH prices are shown site-wide without kopecks (see formatPrice) — mirror that here so the
+// exported order text matches what the buyer actually saw on the product/cart screens.
+function formatAmount(value: number, currency?: 'USD' | 'UAH'): number {
+  return currency === 'UAH' ? Math.round(value) : value;
+}
+
 export function formatOrderText(order: Order): string {
   const symbol = currencySymbol(order.items[0]?.product.currency);
   const lines: string[] = [
@@ -43,14 +49,15 @@ export function formatOrderText(order: Order): string {
     lines.push(`   Розмір:    ${entry.size}`);
     lines.push(`   Колір:     ${entry.color.name}`);
     lines.push(`   Кількість: ${entry.quantity}`);
-    lines.push(`   Ціна:      ${entry.lineTotal / entry.quantity} ${symbol} × ${entry.quantity} = ${entry.lineTotal} ${symbol}`);
+    const currency = entry.product.currency;
+    lines.push(`   Ціна:      ${formatAmount(entry.lineTotal / entry.quantity, currency)} ${symbol} × ${entry.quantity} = ${formatAmount(entry.lineTotal, currency)} ${symbol}`);
     lines.push(`   Джерело:   ${entry.product.sourceName}`);
     lines.push(`   Посилання: ${entry.product.sourceUrl}`);
   });
 
   lines.push('');
   lines.push('───────────────────────────────────────');
-  lines.push(`РАЗОМ: ${order.total} ${symbol}`);
+  lines.push(`РАЗОМ: ${formatAmount(order.total, order.items[0]?.product.currency)} ${symbol}`);
   lines.push('');
   lines.push('⚠️  Увага: це замовлення для ручного викупу');
   lines.push('    на сайтах-джерелах. Оплата не проводиться');

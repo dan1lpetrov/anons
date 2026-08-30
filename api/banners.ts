@@ -1,7 +1,15 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { put } from '@vercel/blob';
+import { dangerouslyDeleteByTag } from '@vercel/functions';
 import { db, ensureSchema } from './_lib/db.js';
 import { requireAdmin } from './_lib/session.js';
+
+// Tag on the public GET's cached response (see handleGet) — every write below purges it via
+// dangerouslyDeleteByTag so the very next storefront request always sees the change immediately,
+// not just "eventually" (that's what invalidateByTag would give: the next request still gets the
+// stale copy while revalidating in the background). The tradeoff Vercel docs warn about —
+// concurrent requests all missing cache at once — isn't a real risk at this site's traffic.
+const BANNERS_CACHE_TAG = 'banners';
 
 interface BannerRow {
   id: number;
@@ -82,10 +90,13 @@ async function handleGet(req: VercelRequest, res: VercelResponse) {
     const { rows } = await db.query<BannerRow>(
       `SELECT ${SELECT_COLUMNS} FROM banners WHERE active = true ORDER BY sort_order ASC, id ASC`,
     );
-    // No caching, unlike /api/products — an admin edit (drag reorder, pause, delete) should be
-    // visible on the storefront on the very next load, not after some TTL window. The banners
-    // table is tiny and this query is cheap, so there's no real cost to skipping the cache.
-    res.setHeader('Cache-Control', 'no-store');
+    // Vercel's shared edge cache does the actual caching (cheap for every visitor, no DB hit);
+    // the browser-facing Cache-Control stays must-revalidate so a stale local copy never lingers
+    // independent of that — every write below purges the tag, so the edge cache effectively
+    // resets on change instead of expiring on a timer.
+    res.setHeader('Vercel-CDN-Cache-Control', 'public, max-age=3600');
+    res.setHeader('Vercel-Cache-Tag', BANNERS_CACHE_TAG);
+    res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
     return res.status(200).json(rows);
   } catch (error) {
     console.error(error);
@@ -133,6 +144,7 @@ async function handlePost(req: VercelRequest, res: VercelResponse) {
          WHERE id = $1`,
         [id, values.imageUrl, values.title, values.subtitle, values.linkCategoryId, values.linkSaleId, values.linkUrl, values.sortOrder, values.active],
       );
+      await dangerouslyDeleteByTag(BANNERS_CACHE_TAG);
       return res.status(200).json({ ok: true, id });
     }
 
@@ -141,6 +153,7 @@ async function handlePost(req: VercelRequest, res: VercelResponse) {
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
       [values.imageUrl, values.title, values.subtitle, values.linkCategoryId, values.linkSaleId, values.linkUrl, values.sortOrder, values.active],
     );
+    await dangerouslyDeleteByTag(BANNERS_CACHE_TAG);
     return res.status(200).json({ ok: true, id: rows[0].id });
   } catch (error) {
     console.error(error);
@@ -159,6 +172,7 @@ async function handleDelete(req: VercelRequest, res: VercelResponse) {
 
   try {
     await db.query('DELETE FROM banners WHERE id = $1', [id]);
+    await dangerouslyDeleteByTag(BANNERS_CACHE_TAG);
     return res.status(200).json({ ok: true });
   } catch (error) {
     console.error(error);

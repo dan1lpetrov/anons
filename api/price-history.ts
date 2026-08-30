@@ -48,21 +48,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const points: PricePoint[] = rows.map((r) => ({ price: toDisplay(Number(r.price)), recordedAt: r.recorded_at }));
 
-    // With fewer than two real recorded points there's no trend to draw yet —
-    // anchor the chart with a synthetic "started at full price" -> current-
-    // price pair so it still shows something for a freshly discounted
-    // product. Once two or more real price-change rows exist, skip this
-    // entirely: keeping the (usually much higher) original price in the
-    // chart's y-scale forever would dwarf real fluctuations and make them
-    // unreadable, and it's already shown as a strikethrough right above the
-    // chart anyway.
-    if (points.length < 2) {
-      if (points.length === 0 && typeof price === 'number' && typeof originalPrice === 'number' && originalPrice !== price) {
-        points.push({ price, recordedAt: new Date().toISOString() });
-      }
-      if (typeof originalPrice === 'number' && points[0]?.price !== originalPrice) {
-        points.unshift({ price: originalPrice, recordedAt: null });
-      }
+    // No recorded history yet — synthesize an original-price -> current-price
+    // pair so the chart still has something to draw for a discounted product.
+    if (points.length === 0 && typeof price === 'number' && typeof originalPrice === 'number' && originalPrice !== price) {
+      points.push({ price, recordedAt: new Date().toISOString() });
+    }
+
+    // The chart should always read as "started at full price" — prepend the
+    // known original price as a synthetic first point (no real recordedAt)
+    // whenever the recorded history doesn't already start there.
+    if (typeof originalPrice === 'number' && points[0]?.price !== originalPrice) {
+      points.unshift({ price: originalPrice, recordedAt: null });
     }
 
     return res.status(200).json({ points });

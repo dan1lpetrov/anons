@@ -1,10 +1,10 @@
 import { ChevronRight } from 'lucide-react';
-import type { Banner, CategoryWithImage, Product } from '../types';
+import type { Banner, CategoryWithImage, ProductCardData } from '../types';
 import { BannerCarousel } from './BannerCarousel';
 import { ProductCard } from './ProductCard';
 
 interface HomeProps {
-  topProducts: Product[];
+  topProducts: ProductCardData[];
   categories: CategoryWithImage[];
   banners: Banner[];
   isLoading: boolean;

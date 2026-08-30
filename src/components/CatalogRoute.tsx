@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SearchX } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import type { CategoryId, Product, ProductsListResponse, ProductsMeta } from '../types';
+import type { CategoryId, ProductCardData, ProductsListResponse, ProductsMeta } from '../types';
 import { sales } from '../data/sales';
 import { useCatalogParams } from '../hooks/useCatalogParams';
 import { useTelegramContext } from '../hooks/useTelegram';
@@ -24,7 +24,7 @@ export function CatalogRoute({ meta, onOpenProduct }: CatalogRouteProps) {
   const { haptic } = useTelegramContext();
   const { category, filters, sort, page, setFilters, setSort, setPage, resetFilters } = useCatalogParams();
 
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<ProductCardData[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 

@@ -113,7 +113,11 @@ async function handleGetList(req: VercelRequest, res: VercelResponse) {
         : `s.score DESC NULLS LAST, d.featured_rank ASC, d.id ASC`;
 
   try {
-    const { rows } = await db.query<{ data: unknown; total_count: string }>(
+    // Projects only what ProductCard actually renders (see src/types/index.ts's ProductCardData)
+    // instead of the full stored blob — every color's full images[]/sizes[]/description/etc. would
+    // otherwise ride along on every catalog page view for data nothing on this screen displays;
+    // the full Product is fetched separately (GET ?id=) once someone opens a product.
+    const { rows } = await db.query<{ card: unknown; total_count: string }>(
       `
       WITH filtered AS (
         SELECT DISTINCT ON (p.id) p.id, p.data, p.featured_rank
@@ -127,7 +131,24 @@ async function handleGetList(req: VercelRequest, res: VercelResponse) {
           AND ($4::text IS NULL OR p.data->>'name' ILIKE $4 ESCAPE '\\' OR p.data->>'description' ILIKE $4 ESCAPE '\\')
         ORDER BY p.id, (p.data->>'price')::numeric ASC
       )
-      SELECT d.data, count(*) OVER() AS total_count
+      SELECT
+        jsonb_build_object(
+          'id', d.id,
+          'name', d.data->>'name',
+          'image', d.data->>'image',
+          'sourceName', d.data->>'sourceName',
+          'currency', d.data->>'currency',
+          'price', (d.data->>'price')::numeric,
+          'originalPrice', (d.data->>'originalPrice')::numeric,
+          'colors', COALESCE((
+            SELECT jsonb_agg(jsonb_build_object(
+              'price', (c->>'price')::numeric,
+              'originalPrice', (c->>'originalPrice')::numeric
+            ))
+            FROM jsonb_array_elements(d.data->'colors') AS c
+          ), '[]'::jsonb)
+        ) AS card,
+        count(*) OVER() AS total_count
       FROM filtered d
       LEFT JOIN product_scores s ON s.product_id = d.id
       ORDER BY ${orderBy}
@@ -137,7 +158,7 @@ async function handleGetList(req: VercelRequest, res: VercelResponse) {
     );
     setProductsCacheHeaders(res);
     return res.status(200).json({
-      products: rows.map((row) => row.data),
+      products: rows.map((row) => row.card),
       totalCount: rows.length > 0 ? Number(rows[0].total_count) : 0,
     });
   } catch (error) {

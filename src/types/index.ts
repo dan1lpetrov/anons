@@ -94,8 +94,29 @@ export interface CategoryWithImage extends Category {
   image: string | null;
 }
 
+// What ProductCard actually renders — a projection of Product, not the full shape. Used by the
+// catalog grid and Home's top-N row, which only ever show a thumbnail/name/price/color-count and
+// navigate to /product/:id on click; the full Product (all colors' images/sizes/description/URLs)
+// is fetched separately once someone actually opens a product. See colorPrice/colorOriginalPrice
+// in utils/format.ts for why each color still carries its own price/originalPrice.
+export interface ProductCardColorData {
+  price?: number;
+  originalPrice?: number;
+}
+
+export interface ProductCardData {
+  id: string;
+  name: string;
+  image: string;
+  sourceName: string;
+  currency?: 'USD' | 'UAH';
+  price: number;
+  originalPrice?: number;
+  colors: ProductCardColorData[];
+}
+
 export interface ProductsListResponse {
-  products: Product[];
+  products: ProductCardData[];
   totalCount: number;
 }
 

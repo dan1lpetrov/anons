@@ -18,7 +18,7 @@ import { OrderSuccess } from './components/OrderSuccess';
 import { ProductDetail } from './components/ProductDetail';
 import { useCart } from './hooks/useCart';
 import { TelegramContext, useTelegram } from './hooks/useTelegram';
-import type { Banner, Order, Product, ProductsListResponse, ProductsMeta } from './types';
+import type { Banner, Order, Product, ProductCardData, ProductsListResponse, ProductsMeta } from './types';
 import { categoriesFromMeta } from './utils/catalog';
 import { logProductEvent, logProductEvents } from './utils/events';
 import { createOrderId, getOrderFromLocalStorage, saveOrderToLocalStorage } from './utils/orderExport';
@@ -112,7 +112,7 @@ export default function App() {
   }, [location.pathname]);
   const availableCategories = useMemo(() => (meta ? categoriesFromMeta(meta) : []), [meta]);
 
-  const [homeProducts, setHomeProducts] = useState<Product[]>([]);
+  const [homeProducts, setHomeProducts] = useState<ProductCardData[]>([]);
   const [isLoadingHomeProducts, setIsLoadingHomeProducts] = useState(true);
   const homeProductsFetchedRef = useRef(false);
   useEffect(() => {

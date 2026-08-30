@@ -1,4 +1,4 @@
-import type { Product } from '../types';
+import type { ProductCardData } from '../types';
 import { colorOriginalPrice, colorPrice, discountPercent, formatPrice, pluralizeUk } from '../utils/format';
 
 export interface ProductDebugStats {
@@ -10,7 +10,7 @@ export interface ProductDebugStats {
 }
 
 interface ProductCardProps {
-  product: Product;
+  product: ProductCardData;
   onClick: () => void;
   debug?: ProductDebugStats;
 }

@@ -1,4 +1,14 @@
-import type { Product, ProductColor } from '../types';
+// Structural rather than the exact Product/ProductColor types — colorPrice/colorOriginalPrice
+// are also used against ProductCardData/ProductCardColorData (the catalog grid's trimmed
+// projection, see types/index.ts), which don't carry every Product field.
+interface PricedProduct {
+  price: number;
+  originalPrice?: number;
+}
+interface PricedColor {
+  price?: number;
+  originalPrice?: number;
+}
 
 // Products carry their own `currency` (set server-side from the site-wide display currency —
 // see api/_lib/pricing.ts's repriceProductData) so the symbol always matches the actual unit
@@ -14,11 +24,11 @@ export function discountPercent(price: number, originalPrice?: number): number |
   return Math.round(((originalPrice - price) / originalPrice) * 100);
 }
 
-export function colorPrice(product: Product, color?: ProductColor): number {
+export function colorPrice(product: PricedProduct, color?: PricedColor): number {
   return color?.price ?? product.price;
 }
 
-export function colorOriginalPrice(product: Product, color?: ProductColor): number | undefined {
+export function colorOriginalPrice(product: PricedProduct, color?: PricedColor): number | undefined {
   return color?.originalPrice ?? product.originalPrice;
 }
 

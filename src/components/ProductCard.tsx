@@ -44,9 +44,6 @@ export function ProductCard({ product, onClick, debug }: ProductCardProps) {
           )}
         </div>
         <div className="product-card__meta">
-          {product.sizes.length > 1 && (
-            <span>{product.sizes.length} {pluralizeUk(product.sizes.length, ['розмір', 'розміри', 'розмірів'])}</span>
-          )}
           {product.colors.length > 1 && (
             <span>{product.colors.length} {pluralizeUk(product.colors.length, ['колір', 'кольори', 'кольорів'])}</span>
           )}

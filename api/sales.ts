@@ -220,7 +220,7 @@ async function repriceCampaignProducts(client: VercelPoolClient, saleEventId: nu
   const { rows } = await client.query<{ id: string; data: ProductData }>('SELECT id, data FROM products WHERE sale_event_id = $1', [
     saleEventId,
   ]);
-  const currency = await getSiteCurrency();
+  const currency = await getSiteCurrency(client);
   return repriceProducts(
     client,
     rows.map((r) => ({ id: r.id, saleEventId, data: r.data, conditions: cond })),
@@ -380,7 +380,7 @@ async function handlePostGlobal(body: Record<string, unknown>, res: VercelRespon
   const client = await db.connect();
   try {
     await client.query('BEGIN');
-    await setSiteCurrency(currency);
+    await setSiteCurrency(currency, client);
     const repricedCount = await repriceAllProducts(client, currency);
     await client.query('COMMIT');
     return res.status(200).json({ ok: true, ...currency, repricedCount });

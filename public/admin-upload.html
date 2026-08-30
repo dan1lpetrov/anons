@@ -61,6 +61,11 @@
           <button id="upload" class="primary" type="button">Залити на сайт</button>
         </div>
         <div id="status" class="status"></div>
+
+        <div id="uploadProgress" class="upload-progress hidden">
+          <div id="uploadProgressBar" class="upload-progress__bar"></div>
+        </div>
+        <ul id="uploadLog" class="upload-log"></ul>
       </section>
     </div>
   </main>
@@ -82,6 +87,40 @@
   const conditionsReadonly = document.getElementById('conditionsReadonly');
   const conditionCommission = document.getElementById('conditionCommission');
   const conditionDiscount = document.getElementById('conditionDiscount');
+  const uploadProgress = document.getElementById('uploadProgress');
+  const uploadProgressBar = document.getElementById('uploadProgressBar');
+  const uploadLog = document.getElementById('uploadLog');
+
+  // --- Upload step log + progress bar ---
+  // Each step starts as a spinner line and gets flipped in place to a check/✗ when it
+  // resolves, rather than appending a separate "done" line — reads like a live task list.
+  function logStep(text) {
+    const li = document.createElement('li');
+    li.className = 'upload-log__item';
+    li.innerHTML = `<span class="upload-log__icon upload-log__icon--pending">${AdminShared.icon('loader', 14)}</span><span class="upload-log__text"></span>`;
+    li.querySelector('.upload-log__text').textContent = text;
+    uploadLog.appendChild(li);
+    uploadLog.scrollTop = uploadLog.scrollHeight;
+    return li;
+  }
+
+  function resolveStep(li, ok, text) {
+    li.className = `upload-log__item upload-log__item--${ok ? 'ok' : 'err'}`;
+    const iconEl = li.querySelector('.upload-log__icon');
+    iconEl.className = `upload-log__icon upload-log__icon--${ok ? 'ok' : 'err'}`;
+    iconEl.innerHTML = AdminShared.icon(ok ? 'check' : 'x', 14);
+    if (text) li.querySelector('.upload-log__text').textContent = text;
+  }
+
+  function resetUploadLog() {
+    uploadLog.innerHTML = '';
+    uploadProgress.classList.remove('hidden');
+    setUploadProgress(0);
+  }
+
+  function setUploadProgress(fraction) {
+    uploadProgressBar.style.width = `${Math.round(Math.max(0, Math.min(1, fraction)) * 100)}%`;
+  }
 
   // Conditions (commission/discount) are fixed at campaign creation — editable only while
   // creating a new campaign; picking an existing one just shows what was set for it (the server
@@ -405,50 +444,80 @@
     }
 
     uploadBtn.disabled = true;
+    resetUploadLog();
+    AdminShared.setStatus(statusEl, 'pending', 'Заливаю...');
+
+    const batches = chunkProductsForUpload(parsed);
+    // Steps: [create campaign?] + one per batch + recompute scores — the progress bar fills as
+    // each one resolves, so the admin sees real work happening on a big multi-batch upload
+    // instead of a status line stuck on "Заливаю..." for however long it takes.
+    const totalSteps = (selectedCampaignId === null ? 1 : 0) + batches.length + 1;
+    let doneSteps = 0;
+    const advance = () => setUploadProgress(++doneSteps / totalSteps);
+
     try {
       let saleEventId = selectedCampaignId;
       if (saleEventId === null) {
         const nameInput = document.getElementById('newCampaignName');
         const endDateInput = document.getElementById('newCampaignEndDate');
-        AdminShared.setStatus(statusEl, 'pending', 'Створюю кампанію...');
-        const res = await fetch('/api/sales', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            saleId: detectedBrand,
-            name: nameInput.value.trim() || undefined,
-            endDate: endDateInput.value || null,
-            ...conditions,
-          }),
-        });
-        const body = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-        saleEventId = body.id;
+        const step = logStep(`Створюю кампанію «${nameInput.value.trim() || 'нова'}»...`);
+        try {
+          const res = await fetch('/api/sales', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              saleId: detectedBrand,
+              name: nameInput.value.trim() || undefined,
+              endDate: endDateInput.value || null,
+              ...conditions,
+            }),
+          });
+          const body = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+          saleEventId = body.id;
+          resolveStep(step, true, `Кампанію «${body.name}» створено`);
+        } catch (err) {
+          resolveStep(step, false, `Не вдалося створити кампанію: ${err.message}`);
+          throw err;
+        }
+        advance();
       }
 
       // The server derives price/originalPrice from each product's basePrice + this campaign's
       // commission/discount + the site's current display currency — nothing to compute here.
-      const batches = chunkProductsForUpload(parsed);
       for (let i = 0; i < batches.length; i++) {
-        const batchLabel = batches.length > 1 ? ` (${i + 1}/${batches.length})` : '';
-        AdminShared.setStatus(statusEl, 'pending', `Заливаю...${batchLabel}`);
-        const res = await fetch('/api/products', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ products: batches[i], saleEventId }),
-        });
-        const body = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+        const batchLabel = batches.length > 1 ? ` (партія ${i + 1}/${batches.length})` : '';
+        const step = logStep(`Заливаю ${batches[i].length} товар(ів)${batchLabel}...`);
+        try {
+          const res = await fetch('/api/products', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ products: batches[i], saleEventId }),
+          });
+          const body = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+          resolveStep(step, true, `Залито ${batches[i].length} товар(ів)${batchLabel}`);
+        } catch (err) {
+          resolveStep(step, false, `Партія${batchLabel} не залилась: ${err.message}`);
+          throw err;
+        }
+        advance();
       }
-      AdminShared.setStatus(statusEl, 'ok', `Готово! Залито ${parsed.length} товар(ів). Перераховую рейтинги...`);
+
+      AdminShared.setStatus(statusEl, 'ok', `Готово! Залито ${parsed.length} товар(ів).`);
+
+      const recomputeStep = logStep('Перераховую рейтинги товарів...');
       try {
-        await fetch('/api/cron/recompute-scores', { method: 'POST', credentials: 'include' });
-        AdminShared.setStatus(statusEl, 'ok', `Готово! Залито ${parsed.length} товар(ів). Онови сайт, щоб побачити зміни.`);
+        const res = await fetch('/api/cron/recompute-scores', { method: 'POST', credentials: 'include' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        resolveStep(recomputeStep, true, 'Рейтинги перераховано');
       } catch {
-        AdminShared.setStatus(statusEl, 'ok', `Залито ${parsed.length} товар(ів), але не вдалося перерахувати рейтинги — вони оновляться за розкладом.`);
+        resolveStep(recomputeStep, false, 'Не вдалося перерахувати рейтинги — оновляться за розкладом');
       }
+      advance();
+
       await detectCampaign();
       selectedCampaignId = saleEventId;
       renderCampaignPicker();

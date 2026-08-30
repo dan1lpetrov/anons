@@ -96,7 +96,7 @@ async function handlePost(req: VercelRequest, res: VercelResponse) {
       buyerCommissionPercent: Number(eventRows[0].buyer_commission_percent),
       additionalDiscountPercent: Number(eventRows[0].additional_discount_percent),
     };
-    const currency = await getSiteCurrency();
+    const currency = await getSiteCurrency(client);
     const priced: (ProductData & Record<string, unknown>)[] = products.map((p) => repriceProductData(p, conditions, currency));
 
     // price_history tracks basePrice × (1 − discount%) × (1 + commission%) — before FX

@@ -1,6 +1,15 @@
 import { db } from './db.js';
 import { NAMED_BANKS, type NamedBank } from './exchangeRates.js';
 
+// A caller already holding a checked-out client (e.g. mid-transaction in api/products.ts or
+// api/sales.ts) must pass it in here instead of letting these fall back to the top-level `db` —
+// `db.query()` grabs its own connection from the same pool, and a caller that's already holding
+// the pool's one connection via `db.connect()` would then deadlock waiting on itself for a
+// second one. Both `db` and a `VercelPoolClient` satisfy this shape.
+interface Queryable {
+  query<T = unknown>(text: string, params?: unknown[]): Promise<{ rows: T[] }>;
+}
+
 // Site-wide display currency — applies to every product on the storefront regardless of which
 // sale campaign it's in. Unlike buyer commission / additional discount (still per-campaign, see
 // sale_events), currency was per-campaign at first and moved here because a shopper browsing the
@@ -19,8 +28,8 @@ export const DEFAULT_SITE_CURRENCY: SiteCurrency = {
   uahRate: null,
 };
 
-export async function getSiteCurrency(): Promise<SiteCurrency> {
-  const { rows } = await db.query<{ display_currency: string; uah_bank: string | null; uah_rate: string | null }>(
+export async function getSiteCurrency(queryable: Queryable = db): Promise<SiteCurrency> {
+  const { rows } = await queryable.query<{ display_currency: string; uah_bank: string | null; uah_rate: string | null }>(
     'SELECT display_currency, uah_bank, uah_rate FROM site_settings WHERE id = 1',
   );
   const row = rows[0];
@@ -35,8 +44,8 @@ export async function getSiteCurrency(): Promise<SiteCurrency> {
   };
 }
 
-export async function setSiteCurrency(currency: SiteCurrency): Promise<void> {
-  await db.query(
+export async function setSiteCurrency(currency: SiteCurrency, queryable: Queryable = db): Promise<void> {
+  await queryable.query(
     `INSERT INTO site_settings (id, display_currency, uah_bank, uah_rate, updated_at)
      VALUES (1, $1, $2, $3, now())
      ON CONFLICT (id) DO UPDATE SET

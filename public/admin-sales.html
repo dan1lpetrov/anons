@@ -30,7 +30,7 @@
         <a class="button primary" href="/admin/upload">+ Додати розпродаж</a>
       </div>
 
-      <section class="sale-card" id="currencyCard"></section>
+      <section class="item-card" id="currencyCard"></section>
       <div id="currencyStatus" class="status"></div>
 
       <section class="section-plain">
@@ -39,7 +39,7 @@
           <button id="reloadSales" class="secondary" type="button">Оновити</button>
         </div>
         <div id="salesSummary" class="sales-summary"></div>
-        <div id="salesList" class="sale-list"></div>
+        <div id="salesList" class="item-list"></div>
         <div id="salesStatus" class="status"></div>
       </section>
     </div>
@@ -137,26 +137,26 @@
     const initialDiscount = sale.additionalDiscountPercent;
 
     const card = document.createElement('section');
-    card.className = 'sale-card';
+    card.className = 'item-card';
     card.innerHTML = `
-      <div class="sale-card__row">
+      <div class="item-card__row">
         <span class="status-dot ${sale.active ? 'active' : 'stopped'}"></span>
-        <div class="sale-card__identity">
-          <span class="sale-card__name">${escapeHtml(sale.name)}</span>
-          <span class="sale-card__brand">${escapeHtml(sale.saleId)}</span>
+        <div class="item-card__identity">
+          <span class="item-card__name">${escapeHtml(sale.name)}</span>
+          <span class="item-card__brand">${escapeHtml(sale.saleId)}</span>
         </div>
-        <div class="sale-card__meta">
+        <div class="item-card__meta">
           <div class="meta-item"><span>Закінчення</span><b>${fmtDate(sale.endDate)}</b></div>
           <div class="meta-item"><span>Товарів</span><b>${sale.productCount}</b></div>
           ${termsChip(sale.buyerCommissionPercent, sale.additionalDiscountPercent)}
         </div>
-        <div class="sale-card__actions">
+        <div class="item-card__actions">
           <button type="button" class="icon-btn edit-toggle" title="Редагувати">${AdminShared.icon('pencil', 14)}</button>
           <button type="button" class="icon-btn danger delete-toggle" title="Видалити">${AdminShared.icon('trash', 14)}</button>
         </div>
       </div>
-      <div class="sale-card__panel sale-card__edit">
-        <div class="field-grid sale-form-grid">
+      <div class="item-card__panel item-card__edit">
+        <div class="field-grid item-form-grid">
           <div class="field field-span-2">
             <label>Назва кампанії</label>
             <input type="text" class="f-name" value="${escapeHtml(sale.name)}" />
@@ -184,7 +184,7 @@
             <input type="number" step="0.1" min="0" class="f-discount" value="${sale.additionalDiscountPercent}" />
           </div>
         </div>
-        <div class="sale-form-footer">
+        <div class="item-form-footer">
           <button type="button" class="danger delete-toggle">Видалити розпродаж</button>
           <div class="row">
             <button type="button" class="secondary cancel-edit-btn">Скасувати</button>
@@ -192,9 +192,9 @@
           </div>
         </div>
       </div>
-      <div class="sale-card__panel sale-card__confirm">
-        <span class="sale-card__confirm-text">Видалити <b>«${escapeHtml(sale.name)}»</b> і всі ${sale.productCount} товарів? Це незворотньо.</span>
-        <div class="sale-card__confirm-actions">
+      <div class="item-card__panel item-card__confirm">
+        <span class="item-card__confirm-text">Видалити <b>«${escapeHtml(sale.name)}»</b> і всі ${sale.productCount} товарів? Це незворотньо.</span>
+        <div class="item-card__confirm-actions">
           <button type="button" class="secondary cancel-delete-btn">Скасувати</button>
           <button type="button" class="danger confirm-delete-btn">Так, видалити</button>
         </div>
@@ -209,7 +209,7 @@
     const confirmDeleteBtn = card.querySelector('.confirm-delete-btn');
     const activeInput = card.querySelector('.f-active');
     const statusWord = card.querySelector('.status-toggle__word');
-    const editIconBtn = card.querySelector('.sale-card__actions .edit-toggle');
+    const editIconBtn = card.querySelector('.item-card__actions .edit-toggle');
 
     function openEdit() {
       card.classList.remove('is-confirming');
@@ -327,20 +327,20 @@
   }
 
   function renderCurrencyCard(state) {
-    currencyCard.className = 'sale-card';
+    currencyCard.className = 'item-card';
     currencyCard.innerHTML = `
-      <div class="sale-card__row">
-        <div class="sale-card__identity">
-          <span class="sale-card__name">Валюта показу на сайті</span>
-          <span class="sale-card__subtitle">${currencySubtitle(state)}</span>
+      <div class="item-card__row">
+        <div class="item-card__identity">
+          <span class="item-card__name">Валюта показу на сайті</span>
+          <span class="item-card__subtitle">${currencySubtitle(state)}</span>
         </div>
-        <div class="sale-card__actions">
+        <div class="item-card__actions">
           <button type="button" class="icon-btn edit-toggle" title="Редагувати">${AdminShared.icon('pencil', 14)}</button>
         </div>
       </div>
-      <div class="sale-card__panel sale-card__edit">
-        <p class="sale-card__hint">Спільна для всього сайту, не залежить від розпродажу. Комісія й знижка лишаються окремо для кожної кампанії нижче.</p>
-        <div class="field-grid sale-form-grid">
+      <div class="item-card__panel item-card__edit">
+        <p class="item-card__hint">Спільна для всього сайту, не залежить від розпродажу. Комісія й знижка лишаються окремо для кожної кампанії нижче.</p>
+        <div class="field-grid item-form-grid">
           <div class="field">
             <label>Валюта показу</label>
             <select class="f-currency">
@@ -364,7 +364,7 @@
             </div>
           </div>
         </div>
-        <div class="sale-form-footer">
+        <div class="item-form-footer">
           <button type="button" class="secondary cancel-currency-btn">Скасувати</button>
           <button type="button" class="primary save-currency-btn">Зберегти</button>
         </div>

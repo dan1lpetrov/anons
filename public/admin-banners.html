@@ -10,28 +10,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/assets/admin.css" />
-<style>
-  .banner-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
-  .banner-form-grid .full { grid-column: 1 / -1; }
-  .banner-form-grid label { display: block; margin-bottom: 4px; }
-  .banner-form-grid input[type="text"],
-  .banner-form-grid input[type="number"],
-  .banner-form-grid select { width: 100%; }
-  .banner-row { display: grid; grid-template-columns: 72px 1fr auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); }
-  .banner-row:last-child { border-bottom: none; }
-  .banner-row__thumb { width: 72px; height: 72px; border-radius: var(--radius-sm); object-fit: cover; background: var(--bg); }
-  .banner-row__body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-  .banner-row__title { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .banner-row__meta { font-size: 12px; color: var(--hint); }
-  .banner-row__actions { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
-  .checkbox-field { display: flex; align-items: center; gap: 8px; }
-  .checkbox-field label { text-transform: none; font-size: 14px; font-weight: 400; color: var(--text); margin: 0; }
-  .banner-image-picker { display: flex; align-items: flex-start; gap: 12px; }
-  .banner-image-picker__preview { width: 96px; height: 96px; border-radius: var(--radius-sm); object-fit: cover; background: var(--bg); border: 1px solid var(--border); flex-shrink: 0; }
-  .banner-image-picker__controls { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-  .link-type-group { display: flex; gap: 16px; }
-  .link-type-group label { display: flex; align-items: center; gap: 6px; text-transform: none; font-size: 14px; font-weight: 400; color: var(--text); margin: 0; }
-</style>
 </head>
 <body>
 
@@ -46,116 +24,26 @@
 <div id="app" class="admin-shell hidden">
   <div id="nav"></div>
   <main class="admin-content">
-    <div class="admin-content__inner">
-      <div>
+    <div class="admin-content__inner admin-content__inner--medium">
+      <div class="row" style="justify-content: space-between;">
         <h1>Банери на головній</h1>
-        <p class="hint">Керує каруселлю банерів на головному екрані сторефронту. Кожен банер обовʼязково веде кудись: на категорію, на активний розпродаж або на будь-яке зовнішнє посилання.</p>
+        <button type="button" class="primary" id="addBannerBtn">+ Додати банер</button>
       </div>
+      <p class="hint">Кожен банер веде на категорію, активний розпродаж або зовнішнє посилання. Перетягни за ручку зліва, щоб змінити порядок у каруселі.</p>
 
-      <section id="addSection">
-        <h2 id="formTitle">Додати банер</h2>
-        <div class="banner-form-grid">
-          <div class="full">
-            <label for="imageFile">Картинка банера</label>
-            <div class="banner-image-picker">
-              <img id="imagePreview" class="banner-image-picker__preview hidden" alt="" />
-              <div class="banner-image-picker__controls">
-                <input id="imageFile" type="file" accept="image/*" />
-                <input id="newImageUrl" type="text" placeholder="https://... (або завантаж файл вище)" />
-              </div>
-            </div>
-            <div id="uploadStatus" class="status"></div>
-          </div>
-          <div>
-            <label for="newTitle">Заголовок</label>
-            <input id="newTitle" type="text" placeholder="SS24 COMING SOON" />
-          </div>
-          <div>
-            <label for="newSubtitle">Підзаголовок</label>
-            <input id="newSubtitle" type="text" placeholder="Дивитись" />
-          </div>
-          <div class="full">
-            <label>Куди веде банер</label>
-            <div class="link-type-group">
-              <label><input type="radio" name="linkType" value="category" checked /> Категорія</label>
-              <label><input type="radio" name="linkType" value="sale" /> Розпродаж</label>
-              <label><input type="radio" name="linkType" value="url" /> URL</label>
-            </div>
-          </div>
-          <div class="full" id="categoryField">
-            <label for="newCategory">Категорія</label>
-            <select id="newCategory"></select>
-          </div>
-          <div class="full hidden" id="saleField">
-            <label for="newSale">Розпродаж</label>
-            <select id="newSale"></select>
-          </div>
-          <div class="full hidden" id="urlField">
-            <label for="newUrl">URL</label>
-            <input id="newUrl" type="text" placeholder="https://..." />
-          </div>
-          <div>
-            <label for="newOrder">Порядок</label>
-            <input id="newOrder" type="number" step="1" value="0" />
-          </div>
-        </div>
-        <div class="checkbox-field">
-          <input id="newActive" type="checkbox" checked />
-          <label for="newActive">Активний</label>
-        </div>
-        <div class="row">
-          <button id="addBanner" class="primary" type="button">Додати банер</button>
-          <button id="cancelEdit" class="secondary hidden" type="button">Скасувати</button>
-        </div>
-        <div id="addStatus" class="status"></div>
-      </section>
-
-      <section>
-        <div class="row" style="justify-content: space-between;">
-          <h2>Усі банери</h2>
-          <button id="reloadBanners" class="secondary" type="button">Оновити</button>
-        </div>
-        <div id="bannersList"></div>
-        <div id="listStatus" class="status"></div>
-      </section>
+      <div id="bannerList" class="item-list"></div>
+      <div id="listStatus" class="status"></div>
     </div>
   </main>
 </div>
 
 <script src="/assets/admin.js"></script>
 <script>
-  const addImageUrl = document.getElementById('newImageUrl');
-  const addTitle = document.getElementById('newTitle');
-  const addSubtitle = document.getElementById('newSubtitle');
-  const addCategory = document.getElementById('newCategory');
-  const addOrder = document.getElementById('newOrder');
-  const addActive = document.getElementById('newActive');
-  const addStatus = document.getElementById('addStatus');
-  const addBtn = document.getElementById('addBanner');
-  const cancelEditBtn = document.getElementById('cancelEdit');
-  const formTitle = document.getElementById('formTitle');
-
-  const imageFile = document.getElementById('imageFile');
-  const imagePreview = document.getElementById('imagePreview');
-  const uploadStatus = document.getElementById('uploadStatus');
-  const linkTypeRadios = document.querySelectorAll('input[name="linkType"]');
-  const categoryField = document.getElementById('categoryField');
-  const saleField = document.getElementById('saleField');
-  const newSale = document.getElementById('newSale');
-  const urlField = document.getElementById('urlField');
-  const newUrl = document.getElementById('newUrl');
-
-  const bannersList = document.getElementById('bannersList');
+  const bannerList = document.getElementById('bannerList');
   const listStatus = document.getElementById('listStatus');
-  const reloadBtn = document.getElementById('reloadBanners');
 
   // Mirrors the SaleId brand enum from src/types — see admin-upload.html's SALES map.
-  const SALES = {
-    nike: { name: 'Nike' },
-    adidas: { name: 'Adidas' },
-    puma: { name: 'Puma' },
-  };
-  let activeSales = [];
+  const SALE_NAMES = { nike: 'Nike', adidas: 'Adidas', puma: 'Puma' };
 
   // Mirrors src/data/categories.ts's CATEGORY_LABELS — categoryId isn't a
   // closed enum, so unknown ids just fall back to showing the raw id.
@@ -167,37 +55,70 @@
     pants: 'Штани',
     jackets: 'Куртки',
   };
-  let availableCategories = [];
 
-  async function loadSalesOptions() {
+  let activeSales = []; // [{ id: saleId, name }]
+  let availableCategories = []; // [categoryId]
+  let banners = []; // client-side shape: { id, image, title, subtitle, active, sortOrder, linkType, linkCategoryId, linkSaleId, linkUrl }
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+  }
+
+  function destSummary(b) {
+    if (b.linkType === 'category') return `категорія → ${CATEGORY_LABELS[b.linkCategoryId] || b.linkCategoryId || '—'}`;
+    if (b.linkType === 'sale') return `розпродаж → ${SALE_NAMES[b.linkSaleId] || b.linkSaleId || '—'}`;
+    return `URL → ${b.linkUrl || '—'}`;
+  }
+
+  function fromApi(row) {
+    let linkType = 'category';
+    if (row.linkUrl) linkType = 'url';
+    else if (row.linkSaleId) linkType = 'sale';
+    return {
+      id: row.id,
+      image: row.imageUrl || '',
+      title: row.title || '',
+      subtitle: row.subtitle || '',
+      active: !!row.active,
+      sortOrder: row.sortOrder ?? 0,
+      linkType,
+      linkCategoryId: row.linkCategoryId || (availableCategories[0] || ''),
+      linkSaleId: row.linkSaleId || (activeSales[0] && activeSales[0].id) || '',
+      linkUrl: row.linkUrl || '',
+    };
+  }
+
+  function toApiPayload(b) {
+    return {
+      ...(typeof b.id === 'number' ? { id: b.id } : {}),
+      imageUrl: b.image.trim(),
+      title: b.title.trim(),
+      subtitle: b.subtitle.trim(),
+      linkCategoryId: b.linkType === 'category' ? b.linkCategoryId || null : null,
+      linkSaleId: b.linkType === 'sale' ? b.linkSaleId || null : null,
+      linkUrl: b.linkType === 'url' ? b.linkUrl.trim() : null,
+      sortOrder: b.sortOrder,
+      active: b.active,
+    };
+  }
+
+  async function loadOptions() {
     try {
       const res = await fetch('/api/sales', { cache: 'no-store', credentials: 'include' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const all = await res.json();
-      // GET /api/sales now returns one row per campaign, and a brand can have several active
-      // campaigns at once — a banner links to the brand, not a specific campaign, so dedupe to
-      // one option per saleId.
-      activeSales = [...new Map(all.filter((s) => s.active).map((s) => [s.saleId, s])).values()];
-    } catch (err) {
+      // A brand can have several active campaigns at once — a banner links to the
+      // brand, not a specific campaign, so dedupe to one option per saleId.
+      activeSales = [...new Map(all.filter((s) => s.active).map((s) => [s.saleId, s])).values()].map((s) => ({
+        id: s.saleId,
+        name: SALE_NAMES[s.saleId] || s.saleId,
+      }));
+    } catch {
       activeSales = [];
     }
-    newSale.innerHTML = '';
-    if (activeSales.length === 0) {
-      const opt = document.createElement('option');
-      opt.value = '';
-      opt.textContent = 'Немає активних розпродажів';
-      newSale.appendChild(opt);
-      return;
-    }
-    activeSales.forEach((s) => {
-      const opt = document.createElement('option');
-      opt.value = s.saleId;
-      opt.textContent = (SALES[s.saleId] && SALES[s.saleId].name) || s.saleId;
-      newSale.appendChild(opt);
-    });
-  }
 
-  async function loadCategoryOptions() {
     try {
       const res = await fetch('/api/products', { cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -210,127 +131,10 @@
           availableCategories.push(p.categoryId);
         }
       });
-      availableCategories.sort((a, b) =>
-        (CATEGORY_LABELS[a] || a).localeCompare(CATEGORY_LABELS[b] || b, 'uk'),
-      );
-    } catch (err) {
+      availableCategories.sort((a, b) => (CATEGORY_LABELS[a] || a).localeCompare(CATEGORY_LABELS[b] || b, 'uk'));
+    } catch {
       availableCategories = [];
     }
-    addCategory.innerHTML = '';
-    if (availableCategories.length === 0) {
-      const opt = document.createElement('option');
-      opt.value = '';
-      opt.textContent = 'Немає доступних категорій';
-      addCategory.appendChild(opt);
-      return;
-    }
-    availableCategories.forEach((id) => {
-      const opt = document.createElement('option');
-      opt.value = id;
-      opt.textContent = CATEGORY_LABELS[id] || id;
-      addCategory.appendChild(opt);
-    });
-  }
-
-  function getLinkType() {
-    return document.querySelector('input[name="linkType"]:checked').value;
-  }
-
-  function setLinkType(type) {
-    document.querySelector(`input[name="linkType"][value="${type}"]`).checked = true;
-    updateLinkFieldVisibility();
-  }
-
-  function updateLinkFieldVisibility() {
-    const type = getLinkType();
-    categoryField.classList.toggle('hidden', type !== 'category');
-    saleField.classList.toggle('hidden', type !== 'sale');
-    urlField.classList.toggle('hidden', type !== 'url');
-  }
-
-  linkTypeRadios.forEach((radio) => radio.addEventListener('change', updateLinkFieldVisibility));
-
-  function updateImagePreview() {
-    const url = addImageUrl.value.trim();
-    if (url) {
-      imagePreview.src = url;
-      imagePreview.classList.remove('hidden');
-    } else {
-      imagePreview.classList.add('hidden');
-    }
-  }
-
-  addImageUrl.addEventListener('input', updateImagePreview);
-
-  imageFile.addEventListener('change', async () => {
-    const file = imageFile.files && imageFile.files[0];
-    if (!file) return;
-    AdminShared.setStatus(uploadStatus, 'pending', 'Завантаження зображення...');
-    try {
-      const res = await fetch(`/api/banners?upload=1&filename=${encodeURIComponent(file.name)}`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': file.type || 'application/octet-stream' },
-        body: file,
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-      addImageUrl.value = body.url;
-      updateImagePreview();
-      AdminShared.setStatus(uploadStatus, 'ok', 'Зображення завантажено.');
-    } catch (err) {
-      AdminShared.setStatus(uploadStatus, 'err', 'Помилка: ' + err.message);
-    } finally {
-      imageFile.value = '';
-    }
-  });
-
-  let editingId = null;
-
-  function startEdit(banner) {
-    editingId = banner.id;
-    addImageUrl.value = banner.imageUrl || '';
-    updateImagePreview();
-    addTitle.value = banner.title || '';
-    addSubtitle.value = banner.subtitle || '';
-    addOrder.value = String(banner.sortOrder ?? 0);
-    addActive.checked = !!banner.active;
-    newUrl.value = '';
-    if (banner.linkUrl) {
-      setLinkType('url');
-      newUrl.value = banner.linkUrl;
-    } else if (banner.linkSaleId) {
-      setLinkType('sale');
-      newSale.value = banner.linkSaleId;
-    } else if (banner.linkCategoryId) {
-      setLinkType('category');
-      addCategory.value = banner.linkCategoryId;
-    } else {
-      // Older banners saved before a link became mandatory — fall back to
-      // "url" empty so the admin has to explicitly pick a destination now.
-      setLinkType('url');
-    }
-    formTitle.textContent = 'Редагувати банер';
-    addBtn.textContent = 'Зберегти зміни';
-    cancelEditBtn.classList.remove('hidden');
-    addStatus.className = 'status';
-    addStatus.textContent = '';
-    addImageUrl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-
-  function stopEdit() {
-    editingId = null;
-    addImageUrl.value = '';
-    updateImagePreview();
-    addTitle.value = '';
-    addSubtitle.value = '';
-    newUrl.value = '';
-    setLinkType('category');
-    addOrder.value = '0';
-    addActive.checked = true;
-    formTitle.textContent = 'Додати банер';
-    addBtn.textContent = 'Додати банер';
-    cancelEditBtn.classList.add('hidden');
   }
 
   async function loadBanners() {
@@ -341,92 +145,431 @@
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `HTTP ${res.status}`);
       }
-      const banners = await res.json();
-      renderBanners(banners);
+      const rows = await res.json();
+      banners = rows.map(fromApi);
+      renderBanners();
       listStatus.className = 'status';
     } catch (err) {
       AdminShared.setStatus(listStatus, 'err', 'Помилка: ' + err.message);
     }
   }
 
-  function renderBanners(banners) {
-    bannersList.innerHTML = '';
+  // Carousel order = position in this array (drag-and-drop reorders it directly). Sort is
+  // stable, so a plain active-first partition keeps everyone's relative order within their own
+  // group — inactive banners just sink below the active ones, they don't lose their place among
+  // themselves.
+  function renderBanners() {
+    banners.sort((a, b) => (a.active === b.active ? 0 : a.active ? -1 : 1));
+    bannerList.innerHTML = '';
     if (banners.length === 0) {
-      bannersList.innerHTML = `<div class="empty-state">${AdminShared.icon('inbox', 32)}<p>Ще немає жодного банера.</p></div>`;
+      bannerList.innerHTML = `<div class="empty-state">${AdminShared.icon('inbox', 32)}<p>Ще немає жодного банера.</p></div>`;
       return;
     }
-
-    banners.forEach((banner) => {
-      const row = document.createElement('div');
-      row.className = 'banner-row';
-
-      const thumb = document.createElement('img');
-      thumb.className = 'banner-row__thumb';
-      thumb.src = banner.imageUrl;
-      thumb.alt = '';
-
-      const body = document.createElement('div');
-      body.className = 'banner-row__body';
-      const title = document.createElement('div');
-      title.className = 'banner-row__title';
-      title.textContent = banner.title || '(без заголовка)';
-      const meta = document.createElement('div');
-      meta.className = 'banner-row__meta';
-      const saleLabel = banner.linkSaleId ? (SALES[banner.linkSaleId] && SALES[banner.linkSaleId].name) || banner.linkSaleId : '';
-      const categoryLabel = banner.linkCategoryId ? CATEGORY_LABELS[banner.linkCategoryId] || banner.linkCategoryId : '';
-      meta.textContent = `#${banner.sortOrder} · ${banner.active ? 'Активний' : 'Вимкнений'}${categoryLabel ? ' · категорія → ' + categoryLabel : ''}${saleLabel ? ' · розпродаж → ' + saleLabel : ''}${banner.linkUrl ? ' · URL → ' + banner.linkUrl : ''}`;
-      body.append(title, meta);
-
-      const actions = document.createElement('div');
-      actions.className = 'banner-row__actions';
-
-      const editBtn = document.createElement('button');
-      editBtn.type = 'button';
-      editBtn.className = 'secondary';
-      editBtn.textContent = 'Редагувати';
-      editBtn.addEventListener('click', () => startEdit(banner));
-
-      const toggleBtn = document.createElement('button');
-      toggleBtn.type = 'button';
-      toggleBtn.className = 'secondary';
-      toggleBtn.textContent = banner.active ? 'Вимкнути' : 'Увімкнути';
-      toggleBtn.addEventListener('click', () => saveBanner({ ...banner, active: !banner.active }));
-
-      const deleteBtn = document.createElement('button');
-      deleteBtn.type = 'button';
-      deleteBtn.className = 'danger';
-      deleteBtn.textContent = 'Видалити';
-      deleteBtn.addEventListener('click', () => deleteBanner(banner.id));
-
-      actions.append(editBtn, toggleBtn, deleteBtn);
-      row.append(thumb, body, actions);
-      bannersList.appendChild(row);
+    let dividerShown = false;
+    banners.forEach((b, i) => {
+      if (!b.active && !dividerShown) {
+        dividerShown = true;
+        const divider = document.createElement('div');
+        divider.className = 'list-divider';
+        divider.textContent = 'Неактивні';
+        bannerList.appendChild(divider);
+      }
+      bannerList.appendChild(buildBannerCard(b, i));
     });
   }
 
-  async function saveBanner(banner) {
-    AdminShared.setStatus(listStatus, 'pending', 'Збереження...');
+  // Persists the current visual order: reassigns sortOrder to match array position and pushes
+  // only the banners whose stored sortOrder actually changed (a plain rename elsewhere in the
+  // list shouldn't cause N unrelated writes).
+  async function persistOrder() {
+    const updates = [];
+    banners.forEach((b, i) => {
+      if (b.sortOrder !== i) {
+        b.sortOrder = i;
+        updates.push(b);
+      }
+    });
+    if (updates.length === 0) return;
+    AdminShared.setStatus(listStatus, 'pending', 'Зберігаю порядок...');
+    try {
+      await Promise.all(
+        updates.map((b) =>
+          fetch('/api/banners', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(toApiPayload(b)),
+          }),
+        ),
+      );
+      listStatus.className = 'status';
+    } catch (err) {
+      AdminShared.setStatus(listStatus, 'err', 'Не вдалося зберегти порядок: ' + err.message);
+    }
+  }
+
+  // --- Drag-and-drop reorder ---
+  // The handle is the only draggable element (so clicks on inputs/buttons elsewhere in the
+  // card still work), but its drag *image* is set to the whole row so the banner itself looks
+  // like it's being picked up, not just the grip icon. A single shared indicator line tracks
+  // exactly where the drop would land — above or below whichever half of a card the pointer is
+  // over — so "drop on a banner" always means "drop before/after it," never "swap with it."
+  let draggedIndex = null;
+  let dropTargetIndex = null;
+  let dropBefore = true;
+  let dropIndicatorEl = null;
+
+  function dropIndicator() {
+    if (!dropIndicatorEl) {
+      dropIndicatorEl = document.createElement('div');
+      dropIndicatorEl.className = 'drop-indicator';
+    }
+    return dropIndicatorEl;
+  }
+
+  function cleanupDrag() {
+    if (dropIndicatorEl && dropIndicatorEl.parentNode) dropIndicatorEl.parentNode.removeChild(dropIndicatorEl);
+    draggedIndex = null;
+    dropTargetIndex = null;
+  }
+
+  function finishDrag() {
+    if (draggedIndex === null || dropTargetIndex === null) {
+      cleanupDrag();
+      return;
+    }
+    let target = dropTargetIndex + (dropBefore ? 0 : 1);
+    if (draggedIndex < target) target -= 1; // removing the dragged item shifts everything after it down by one
+    if (target !== draggedIndex) {
+      const [moved] = banners.splice(draggedIndex, 1);
+      banners.splice(target, 0, moved);
+    }
+    cleanupDrag();
+    renderBanners();
+    persistOrder();
+  }
+
+  // Per-card dragover/drop (in wireDrag) only fires while the pointer is over a card's own box,
+  // and stops there via stopPropagation. Dragging past the top of the first card or below the
+  // bottom of the last one lands the pointer over empty list space that no card covers — this
+  // container-level listener is the catch-all for that empty space.
+  bannerList.addEventListener('dragover', (e) => {
+    if (draggedIndex === null) return;
+    e.preventDefault();
+    const cards = [...bannerList.querySelectorAll('.item-card:not([data-new])')];
+    if (cards.length === 0) return;
+    const firstRect = cards[0].getBoundingClientRect();
+    const lastRect = cards[cards.length - 1].getBoundingClientRect();
+    if (e.clientY < firstRect.top) {
+      dropTargetIndex = 0;
+      dropBefore = true;
+      bannerList.insertBefore(dropIndicator(), cards[0]);
+    } else if (e.clientY > lastRect.bottom) {
+      dropTargetIndex = banners.length - 1;
+      dropBefore = false;
+      bannerList.appendChild(dropIndicator());
+    }
+  });
+  bannerList.addEventListener('drop', (e) => {
+    if (draggedIndex === null) return;
+    e.preventDefault();
+    finishDrag();
+  });
+
+  function wireDrag(card, handle, index) {
+    const row = card.querySelector('.item-card__row');
+
+    handle.addEventListener('dragstart', (e) => {
+      draggedIndex = index;
+      card.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', String(index));
+      const rect = row.getBoundingClientRect();
+      e.dataTransfer.setDragImage(row, e.clientX - rect.left, e.clientY - rect.top);
+    });
+    handle.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      cleanupDrag();
+    });
+
+    card.addEventListener('dragover', (e) => {
+      if (draggedIndex === null) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const rect = card.getBoundingClientRect();
+      dropBefore = e.clientY - rect.top < rect.height / 2;
+      dropTargetIndex = index;
+      const indicator = dropIndicator();
+      card.parentNode.insertBefore(indicator, dropBefore ? card : card.nextSibling);
+    });
+    card.addEventListener('drop', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      finishDrag();
+    });
+  }
+
+  function updatePreview(card) {
+    const img = card.querySelector('.f-image').value.trim();
+    const title = card.querySelector('.f-title').value.trim();
+    const subtitle = card.querySelector('.f-subtitle').value.trim();
+    const preview = card.querySelector('.banner-preview');
+    preview.querySelector('.banner-preview__img').src = img;
+    preview.querySelector('.banner-preview__img').classList.toggle('hidden', !img);
+    preview.querySelector('.banner-preview__empty').classList.toggle('hidden', !!img);
+    preview.querySelector('.banner-preview__title').textContent = title || 'Заголовок банера';
+    const subtitleEl = preview.querySelector('.banner-preview__subtitle');
+    subtitleEl.textContent = subtitle;
+    subtitleEl.classList.toggle('hidden', !subtitle);
+  }
+
+  function categoryOptionsHtml(selected) {
+    if (availableCategories.length === 0) return `<option value="">Немає доступних категорій</option>`;
+    return availableCategories.map((id) => `<option value="${id}" ${selected === id ? 'selected' : ''}>${CATEGORY_LABELS[id] || id}</option>`).join('');
+  }
+
+  function saleOptionsHtml(selected) {
+    if (activeSales.length === 0) return `<option value="">Немає активних розпродажів</option>`;
+    return activeSales.map((s) => `<option value="${s.id}" ${selected === s.id ? 'selected' : ''}>${s.name}</option>`).join('');
+  }
+
+  function buildBannerCard(b, index, isNew) {
+    const card = document.createElement('div');
+    card.className = 'item-card card';
+    if (isNew) card.dataset.new = 'true'; // excluded from drag targeting — it isn't in `banners` yet
+    card.innerHTML = `
+      <div class="item-card__row">
+        <span class="drag-handle" draggable="true" title="Перетягни, щоб змінити порядок">${AdminShared.icon('grip', 14)}</span>
+        <img class="item-thumb" src="${escapeHtml(b.image)}" alt="" />
+        <div class="item-card__identity">
+          <span class="item-card__name">${escapeHtml(b.title) || '(без заголовка)'}</span>
+          <span class="item-card__subtitle">${escapeHtml(destSummary(b))}</span>
+        </div>
+        <span class="status-dot ${b.active ? 'active' : 'stopped'}" title="${b.active ? 'Активний' : 'Вимкнений'}"></span>
+        <div class="item-card__actions">
+          <button type="button" class="icon-btn edit-toggle" title="Редагувати">${AdminShared.icon('pencil', 14)}</button>
+          <button type="button" class="icon-btn danger delete-toggle" title="Видалити">${AdminShared.icon('trash', 14)}</button>
+        </div>
+      </div>
+      <div class="item-card__panel item-card__edit">
+        <div class="field-grid item-form-grid">
+          <div class="field field-span-4">
+            <label>Картинка банера</label>
+            <div class="image-picker">
+              <img class="image-picker__preview" src="${escapeHtml(b.image)}" alt="" />
+              <div class="image-picker__controls">
+                <input type="file" class="f-image-file" accept="image/*" />
+                <input type="text" class="f-image" value="${escapeHtml(b.image)}" placeholder="https://... (або завантаж файл вище)" />
+                <div class="status f-image-status"></div>
+              </div>
+            </div>
+          </div>
+          <div class="field field-span-2">
+            <label>Заголовок</label>
+            <input type="text" class="f-title" value="${escapeHtml(b.title)}" placeholder="SS24 COMING SOON" />
+          </div>
+          <div class="field field-span-2">
+            <label>Підзаголовок</label>
+            <input type="text" class="f-subtitle" value="${escapeHtml(b.subtitle)}" placeholder="Дивитись" />
+          </div>
+          <div class="field field-span-4">
+            <label>Прев'ю на сайті</label>
+            <div class="banner-preview">
+              <img class="banner-preview__img ${b.image ? '' : 'hidden'}" src="${escapeHtml(b.image)}" alt="" />
+              <div class="banner-preview__empty ${b.image ? 'hidden' : ''}">без картинки</div>
+              <div class="banner-preview__overlay">
+                <span class="banner-preview__title">${escapeHtml(b.title) || 'Заголовок банера'}</span>
+                <span class="banner-preview__subtitle ${b.subtitle ? '' : 'hidden'}">${escapeHtml(b.subtitle)}</span>
+              </div>
+            </div>
+          </div>
+          <div class="field field-span-4">
+            <label>Куди веде банер</label>
+            <div class="segmented f-link-type">
+              <button type="button" data-val="category" class="${b.linkType === 'category' ? 'active' : ''}">Категорія</button>
+              <button type="button" data-val="sale" class="${b.linkType === 'sale' ? 'active' : ''}">Розпродаж</button>
+              <button type="button" data-val="url" class="${b.linkType === 'url' ? 'active' : ''}">URL</button>
+            </div>
+          </div>
+          <div class="field field-span-4 dest-field dest-category ${b.linkType !== 'category' ? 'hidden' : ''}">
+            <label>Категорія</label>
+            <select class="f-category">${categoryOptionsHtml(b.linkCategoryId)}</select>
+          </div>
+          <div class="field field-span-4 dest-field dest-sale ${b.linkType !== 'sale' ? 'hidden' : ''}">
+            <label>Розпродаж</label>
+            <select class="f-sale">${saleOptionsHtml(b.linkSaleId)}</select>
+          </div>
+          <div class="field field-span-4 dest-field dest-url ${b.linkType !== 'url' ? 'hidden' : ''}">
+            <label>URL</label>
+            <input type="text" class="f-url" value="${escapeHtml(b.linkUrl)}" placeholder="https://..." />
+          </div>
+          <div class="field field-span-2">
+            <label>Активний</label>
+            <div class="status-toggle">
+              <label class="switch">
+                <input type="checkbox" class="f-active" ${b.active ? 'checked' : ''} />
+                <span class="switch-track"></span>
+              </label>
+              <span class="status-toggle__word ${b.active ? 'active-text' : 'paused-text'}">${b.active ? 'Показується' : 'Вимкнено'}</span>
+            </div>
+          </div>
+        </div>
+        <div class="item-form-footer">
+          <button type="button" class="danger delete-toggle">Видалити банер</button>
+          <div class="row">
+            <button type="button" class="secondary cancel-edit-btn">Скасувати</button>
+            <button type="button" class="primary save-edit-btn">Зберегти</button>
+          </div>
+        </div>
+      </div>
+      <div class="item-card__panel item-card__confirm">
+        <span class="item-card__confirm-text">Видалити банер <b>«${escapeHtml(b.title) || '(без заголовка)'}»</b>?</span>
+        <div class="item-card__confirm-actions">
+          <button type="button" class="secondary cancel-delete-btn">Скасувати</button>
+          <button type="button" class="danger confirm-delete-btn">Так, видалити</button>
+        </div>
+      </div>
+    `;
+
+    const editIconBtn = card.querySelector('.item-card__actions .edit-toggle');
+    const editToggles = card.querySelectorAll('.edit-toggle');
+    const deleteToggles = card.querySelectorAll('.delete-toggle');
+    const cancelEditBtn = card.querySelector('.cancel-edit-btn');
+    const saveBtn = card.querySelector('.save-edit-btn');
+    const cancelDeleteBtn = card.querySelector('.cancel-delete-btn');
+    const confirmDeleteBtn = card.querySelector('.confirm-delete-btn');
+    const linkTypeSeg = card.querySelector('.f-link-type');
+    const activeInput = card.querySelector('.f-active');
+    const activeWord = card.querySelector('.status-toggle__word');
+    const dragHandle = card.querySelector('.drag-handle');
+    const imageFileInput = card.querySelector('.f-image-file');
+    const imageStatus = card.querySelector('.f-image-status');
+
+    if (isNew) {
+      dragHandle.classList.add('hidden');
+    } else {
+      wireDrag(card, dragHandle, index);
+    }
+
+    function openEdit() { card.classList.remove('is-confirming'); card.classList.add('is-editing'); editIconBtn.classList.add('is-active'); }
+    function closeEdit() { card.classList.remove('is-editing'); editIconBtn.classList.remove('is-active'); }
+    function openConfirm() { closeEdit(); card.classList.add('is-confirming'); }
+    function closeConfirm() { card.classList.remove('is-confirming'); }
+
+    editToggles.forEach((btn) => btn.addEventListener('click', () => (card.classList.contains('is-editing') ? closeEdit() : openEdit())));
+    if (isNew) {
+      // Never persisted yet — removing it is just a DOM removal, nothing to confirm or call the API for.
+      deleteToggles.forEach((btn) => btn.addEventListener('click', () => card.remove()));
+      cancelEditBtn.addEventListener('click', () => card.remove());
+    } else {
+      deleteToggles.forEach((btn) => btn.addEventListener('click', openConfirm));
+      cancelEditBtn.addEventListener('click', closeEdit);
+      cancelDeleteBtn.addEventListener('click', closeConfirm);
+      confirmDeleteBtn.addEventListener('click', () => deleteBanner(b, confirmDeleteBtn));
+    }
+
+    linkTypeSeg.querySelectorAll('button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        linkTypeSeg.querySelectorAll('button').forEach((b2) => b2.classList.remove('active'));
+        btn.classList.add('active');
+        card.querySelectorAll('.dest-field').forEach((f) => f.classList.add('hidden'));
+        card.querySelector(`.dest-${btn.dataset.val}`).classList.remove('hidden');
+      });
+    });
+
+    activeInput.addEventListener('change', () => {
+      activeWord.textContent = activeInput.checked ? 'Показується' : 'Вимкнено';
+      activeWord.className = 'status-toggle__word ' + (activeInput.checked ? 'active-text' : 'paused-text');
+    });
+
+    card.querySelector('.f-image').addEventListener('input', () => {
+      card.querySelector('.image-picker__preview').src = card.querySelector('.f-image').value.trim();
+      updatePreview(card);
+    });
+    card.querySelector('.f-title').addEventListener('input', () => updatePreview(card));
+    card.querySelector('.f-subtitle').addEventListener('input', () => updatePreview(card));
+
+    imageFileInput.addEventListener('change', async () => {
+      const file = imageFileInput.files && imageFileInput.files[0];
+      if (!file) return;
+      AdminShared.setStatus(imageStatus, 'pending', 'Завантаження зображення...');
+      try {
+        const res = await fetch(`/api/banners?upload=1&filename=${encodeURIComponent(file.name)}`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': file.type || 'application/octet-stream' },
+          body: file,
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+        card.querySelector('.f-image').value = body.url;
+        card.querySelector('.image-picker__preview').src = body.url;
+        updatePreview(card);
+        imageStatus.className = 'status';
+      } catch (err) {
+        AdminShared.setStatus(imageStatus, 'err', 'Помилка: ' + err.message);
+      } finally {
+        imageFileInput.value = '';
+      }
+    });
+
+    saveBtn.addEventListener('click', () => {
+      const image = card.querySelector('.f-image').value.trim();
+      if (!image) {
+        AdminShared.setStatus(listStatus, 'err', 'Картинка банера обовʼязкова.');
+        return;
+      }
+      const linkType = linkTypeSeg.querySelector('button.active').dataset.val;
+      if (linkType === 'url' && !/^https?:\/\/.+/.test(card.querySelector('.f-url').value.trim())) {
+        AdminShared.setStatus(listStatus, 'err', 'Введіть коректний URL (з http:// або https://).');
+        return;
+      }
+      b.image = image;
+      b.title = card.querySelector('.f-title').value;
+      b.subtitle = card.querySelector('.f-subtitle').value;
+      b.active = activeInput.checked;
+      b.linkType = linkType;
+      b.linkCategoryId = card.querySelector('.f-category').value;
+      b.linkSaleId = card.querySelector('.f-sale').value;
+      b.linkUrl = card.querySelector('.f-url').value;
+      saveBanner(b, saveBtn);
+    });
+
+    return card;
+  }
+
+  async function saveBanner(b, triggerBtn) {
+    if (triggerBtn) triggerBtn.disabled = true;
+    const isNew = typeof b.id !== 'number';
+    AdminShared.setStatus(listStatus, 'pending', isNew ? 'Додавання...' : 'Збереження...');
     try {
       const res = await fetch('/api/banners', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(banner),
+        body: JSON.stringify(toApiPayload(b)),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-      AdminShared.setStatus(listStatus, 'ok', 'Збережено.');
+      if (isNew) {
+        b.id = body.id;
+        banners.unshift(b);
+        renderBanners();
+        await persistOrder(); // pushes everyone else's sortOrder down so the new one sticks at the top
+      }
+      AdminShared.setStatus(listStatus, 'ok', isNew ? 'Додано.' : 'Збережено.');
       loadBanners();
     } catch (err) {
       AdminShared.setStatus(listStatus, 'err', 'Помилка: ' + err.message);
+      if (triggerBtn) triggerBtn.disabled = false;
     }
   }
 
-  async function deleteBanner(id) {
-    if (!confirm('Видалити цей банер?')) return;
+  async function deleteBanner(b, triggerBtn) {
+    if (triggerBtn) triggerBtn.disabled = true;
     AdminShared.setStatus(listStatus, 'pending', 'Видалення...');
     try {
-      const res = await fetch(`/api/banners?id=${encodeURIComponent(id)}`, {
+      const res = await fetch(`/api/banners?id=${encodeURIComponent(b.id)}`, {
         method: 'DELETE',
         credentials: 'include',
       });
@@ -436,64 +579,24 @@
       loadBanners();
     } catch (err) {
       AdminShared.setStatus(listStatus, 'err', 'Помилка: ' + err.message);
+      if (triggerBtn) triggerBtn.disabled = false;
     }
   }
 
-  addBtn.addEventListener('click', async () => {
-    if (!addImageUrl.value.trim()) {
-      AdminShared.setStatus(addStatus, 'err', 'URL картинки обовʼязковий.');
-      return;
-    }
-    const isEdit = editingId !== null;
-    const linkType = getLinkType();
-    if (linkType === 'category' && !addCategory.value) {
-      AdminShared.setStatus(addStatus, 'err', 'Оберіть категорію.');
-      return;
-    }
-    if (linkType === 'sale' && !newSale.value) {
-      AdminShared.setStatus(addStatus, 'err', 'Оберіть активний розпродаж.');
-      return;
-    }
-    if (linkType === 'url' && !/^https?:\/\/.+/.test(newUrl.value.trim())) {
-      AdminShared.setStatus(addStatus, 'err', 'Введіть коректний URL (з http:// або https://).');
-      return;
-    }
-    addBtn.disabled = true;
-    try {
-      AdminShared.setStatus(addStatus, 'pending', isEdit ? 'Збереження...' : 'Додавання...');
-      await saveBanner({
-        ...(isEdit ? { id: editingId } : {}),
-        imageUrl: addImageUrl.value.trim(),
-        title: addTitle.value.trim(),
-        subtitle: addSubtitle.value.trim(),
-        linkCategoryId: linkType === 'category' ? addCategory.value || null : null,
-        linkSaleId: linkType === 'sale' ? newSale.value : null,
-        linkUrl: linkType === 'url' ? newUrl.value.trim() : null,
-        sortOrder: Number(addOrder.value) || 0,
-        active: addActive.checked,
-      });
-      stopEdit();
-      AdminShared.setStatus(addStatus, 'ok', isEdit ? 'Збережено.' : 'Додано.');
-    } catch (err) {
-      AdminShared.setStatus(addStatus, 'err', 'Помилка: ' + err.message);
-    } finally {
-      addBtn.disabled = false;
-    }
+  document.getElementById('addBannerBtn').addEventListener('click', () => {
+    const blank = {
+      id: null, image: '', title: '', subtitle: '', active: true, sortOrder: 0,
+      linkType: 'category', linkCategoryId: availableCategories[0] || '', linkSaleId: (activeSales[0] && activeSales[0].id) || '', linkUrl: '',
+    };
+    const card = buildBannerCard(blank, -1, true);
+    card.classList.add('is-editing');
+    card.querySelector('.save-edit-btn').textContent = 'Додати';
+    bannerList.prepend(card);
   });
-
-  cancelEditBtn.addEventListener('click', () => {
-    stopEdit();
-    addStatus.className = 'status';
-    addStatus.textContent = '';
-  });
-
-  reloadBtn.addEventListener('click', loadBanners);
 
   AdminShared.init('banners').then((email) => {
     if (email) {
-      // Loaded together so the category/sale <select>s already have their
-      // options by the time a banner row's "Редагувати" button is clickable.
-      Promise.all([loadBanners(), loadSalesOptions(), loadCategoryOptions()]);
+      loadOptions().then(loadBanners);
     }
   });
 </script>

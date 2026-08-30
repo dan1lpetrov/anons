@@ -24,49 +24,61 @@
 <div id="app" class="admin-shell hidden">
   <div id="nav"></div>
   <main class="admin-content">
-    <div class="admin-content__inner">
+    <div class="admin-content__inner admin-content__inner--medium">
       <div>
         <h1>Додати розпродаж</h1>
         <p class="hint">Встав JSON або JSONL зі скрапера (по одному товару на рядок) або завантаж файл — формат нормалізується автоматично. Завантаження нічого не видаляє: товари додаються або оновлюють ціну в межах обраної кампанії.</p>
       </div>
 
       <section id="uploadSection">
-        <label for="file">Файл products.json або products.jsonl</label>
-        <input id="file" type="file" accept="application/json,.json,.jsonl,text/plain" />
-        <label for="json">Або встав JSON вручну</label>
-        <textarea id="json" placeholder="[ { &quot;id&quot;: &quot;...&quot;, &quot;name&quot;: &quot;...&quot;, ... } ]"></textarea>
+        <h2>Товари</h2>
+        <div class="field">
+          <label for="file">Файл products.json або products.jsonl</label>
+          <input id="file" type="file" accept="application/json,.json,.jsonl,text/plain" />
+        </div>
+        <div class="field">
+          <label for="json">Або встав JSON вручну</label>
+          <textarea id="json" placeholder="[ { &quot;id&quot;: &quot;...&quot;, &quot;name&quot;: &quot;...&quot;, ... } ]"></textarea>
+          <div id="parseStatus" class="parse-status"></div>
+        </div>
         <div class="row">
           <button id="loadCurrent" class="secondary" type="button">Завантажити поточні товари</button>
         </div>
-
-        <div id="campaignSection" class="hidden" style="margin-top: 16px;">
-          <label>Кампанія (<span id="campaignBrand"></span>)</label>
-          <div id="campaignPicker"></div>
-        </div>
-        <div id="campaignHint" class="hint"></div>
-
-        <div id="conditionsSection" class="hidden" style="margin-top: 16px;">
-          <label>Умови розпродажу</label>
-          <p class="hint">Валюта показу тепер спільна для всього сайту — редагується в <a href="/admin/sales">Розпродажах</a>.</p>
-          <div id="conditionsEditor" class="conditions-grid">
-            <label for="conditionCommission">Комісія баєра, %</label>
-            <input id="conditionCommission" type="number" step="0.1" min="0" value="10" />
-            <label for="conditionDiscount">Додаткова знижка, %</label>
-            <input id="conditionDiscount" type="number" step="0.1" min="0" value="0" />
-          </div>
-          <div id="conditionsReadonly" class="conditions-summary hidden"></div>
-        </div>
-
-        <div class="row" style="margin-top: 16px;">
-          <button id="upload" class="primary" type="button">Залити на сайт</button>
-        </div>
-        <div id="status" class="status"></div>
-
-        <div id="uploadProgress" class="upload-progress hidden">
-          <div id="uploadProgressBar" class="upload-progress__bar"></div>
-        </div>
-        <ul id="uploadLog" class="upload-log"></ul>
       </section>
+
+      <div id="campaignSection" class="hidden">
+        <section>
+          <h2>Кампанія</h2>
+          <p class="hint">Бренд визначено: <b id="campaignBrand" style="color: var(--text);"></b></p>
+          <div id="campaignPicker" class="campaign-picker"></div>
+        </section>
+
+        <section id="conditionsSection">
+          <h2>Умови розпродажу</h2>
+          <p class="hint">Валюта показу тепер спільна для всього сайту — редагується в <a href="/admin/sales">Розпродажах</a>.</p>
+          <div id="conditionsEditor" class="field-grid">
+            <div class="field">
+              <label for="conditionCommission">Комісія баєра, %</label>
+              <input id="conditionCommission" type="number" step="0.1" min="0" value="10" />
+            </div>
+            <div class="field">
+              <label for="conditionDiscount">Додаткова знижка, %</label>
+              <input id="conditionDiscount" type="number" step="0.1" min="0" value="0" />
+            </div>
+          </div>
+          <div id="conditionsReadonly" class="hint hidden"></div>
+        </section>
+      </div>
+
+      <div class="row">
+        <button id="upload" class="primary" type="button" disabled>Залити на сайт</button>
+      </div>
+      <div id="status" class="status"></div>
+
+      <div id="uploadProgress" class="upload-progress hidden">
+        <div id="uploadProgressBar" class="upload-progress__bar"></div>
+      </div>
+      <ul id="uploadLog" class="upload-log"></ul>
     </div>
   </main>
 </div>
@@ -75,14 +87,13 @@
 <script>
   const fileInput = document.getElementById('file');
   const jsonArea = document.getElementById('json');
+  const parseStatusEl = document.getElementById('parseStatus');
   const statusEl = document.getElementById('status');
   const uploadBtn = document.getElementById('upload');
   const loadBtn = document.getElementById('loadCurrent');
   const campaignSection = document.getElementById('campaignSection');
   const campaignBrandEl = document.getElementById('campaignBrand');
   const campaignPicker = document.getElementById('campaignPicker');
-  const campaignHint = document.getElementById('campaignHint');
-  const conditionsSection = document.getElementById('conditionsSection');
   const conditionsEditor = document.getElementById('conditionsEditor');
   const conditionsReadonly = document.getElementById('conditionsReadonly');
   const conditionCommission = document.getElementById('conditionCommission');
@@ -313,21 +324,29 @@
     const suggested = nextCampaignName(detectedBrand, campaigns);
     const rows = [];
     rows.push(`
-      <label class="campaign-option">
+      <label class="campaign-option ${selectedCampaignId === null ? 'selected' : ''}">
         <input type="radio" name="campaignChoice" value="new" ${selectedCampaignId === null ? 'checked' : ''} />
-        Нова кампанія:
-        <input id="newCampaignName" type="text" value="${escapeHtml(suggested)}" style="width: 220px;" />
-        <span class="hint">дійсна до</span>
-        <input id="newCampaignEndDate" type="date" />
+        <div class="campaign-option__body">
+          <span class="campaign-option__title">Нова кампанія</span>
+          <span class="campaign-option__meta">створити окрему кампанію для цього завантаження</span>
+          <div class="campaign-option__new-fields ${selectedCampaignId === null ? '' : 'hidden'}">
+            <input id="newCampaignName" type="text" value="${escapeHtml(suggested)}" />
+            <span>дійсна до</span>
+            <input id="newCampaignEndDate" type="date" style="width: 150px;" />
+          </div>
+        </div>
       </label>
     `);
     campaigns.forEach((c) => {
-      const status = c.active ? 'активна' : 'зупинена';
       const end = c.endDate ? new Date(c.endDate).toLocaleDateString('uk-UA') : 'без дати';
       rows.push(`
-        <label class="campaign-option">
+        <label class="campaign-option ${selectedCampaignId === c.id ? 'selected' : ''}">
           <input type="radio" name="campaignChoice" value="${c.id}" ${selectedCampaignId === c.id ? 'checked' : ''} />
-          ${escapeHtml(c.name)} — ${status}, ${end}, товарів: ${c.productCount}
+          <span class="status-dot ${c.active ? 'active' : 'stopped'}"></span>
+          <div class="campaign-option__body">
+            <span class="campaign-option__title">${escapeHtml(c.name)}</span>
+            <span class="campaign-option__meta">до ${end} · товарів: ${c.productCount}</span>
+          </div>
         </label>
       `);
     });
@@ -335,7 +354,7 @@
     campaignPicker.querySelectorAll('input[name="campaignChoice"]').forEach((input) => {
       input.addEventListener('change', (e) => {
         selectedCampaignId = e.target.value === 'new' ? null : Number(e.target.value);
-        renderConditionsForSelection();
+        renderCampaignPicker();
       });
     });
     renderConditionsForSelection();
@@ -347,34 +366,65 @@
     return div.innerHTML;
   }
 
+  // --- Live parse/validate as-you-type — mirrors detectCampaign's own parse but only to
+  // surface immediate feedback (count, brand, price range, missing images) before the admin
+  // commits to an upload; detectCampaign below still does the real brand/campaign resolution.
+  function updateParseStatus(parsed, error) {
+    if (!jsonArea.value.trim()) {
+      parseStatusEl.innerHTML = '';
+      return;
+    }
+    if (error) {
+      parseStatusEl.className = 'parse-status err';
+      parseStatusEl.innerHTML = `${AdminShared.icon('x', 14)} ${error}`;
+      return;
+    }
+    const brands = [...new Set(parsed.map((p) => p.saleId).filter(Boolean))];
+    if (brands.length > 1) {
+      parseStatusEl.className = 'parse-status err';
+      parseStatusEl.innerHTML = `${AdminShared.icon('x', 14)} В одному завантаженні мають бути товари лише одного бренду (знайдено: ${brands.join(', ')}).`;
+      return;
+    }
+    if (brands.length === 0) {
+      parseStatusEl.className = 'parse-status warn';
+      parseStatusEl.innerHTML = `${AdminShared.icon('alertTriangle', 14)} Не вдалося визначити бренд товарів.`;
+      return;
+    }
+    const prices = parsed.map((p) => p.basePrice).filter((n) => typeof n === 'number' && n > 0);
+    const priceRange = prices.length ? `$${Math.min(...prices)}–${Math.max(...prices)}` : '—';
+    const noImage = parsed.filter((p) => !p.image).length;
+    const brandLabel = (SALES[brands[0]] && SALES[brands[0]].name) || brands[0];
+    const parts = [`${parsed.length} товар(ів) розпізнано`, `бренд ${brandLabel}`, `ціни ${priceRange}`];
+    if (noImage > 0) parts.push(`${noImage} без фото`);
+    parseStatusEl.className = noImage > 0 ? 'parse-status warn' : 'parse-status ok';
+    parseStatusEl.innerHTML = `${AdminShared.icon(noImage > 0 ? 'alertTriangle' : 'check', 14)} ${parts.join(' · ')}`;
+  }
+
   async function detectCampaign() {
     let parsed;
     try {
       parsed = parseProductsPayload(jsonArea.value).map(normalizeProduct);
-    } catch {
+    } catch (err) {
       campaignSection.classList.add('hidden');
-      conditionsSection.classList.add('hidden');
-      campaignHint.textContent = '';
+      uploadBtn.disabled = true;
       detectedBrand = null;
+      updateParseStatus(null, jsonArea.value.trim() ? err.message : null);
       return;
     }
 
     const brands = [...new Set(parsed.map((p) => p.saleId).filter(Boolean))];
+    updateParseStatus(parsed, null);
     if (brands.length !== 1) {
       campaignSection.classList.add('hidden');
-      conditionsSection.classList.add('hidden');
-      campaignHint.textContent =
-        brands.length === 0
-          ? 'Не вдалося визначити бренд товарів.'
-          : 'В одному завантаженні мають бути товари лише одного бренду.';
+      uploadBtn.disabled = true;
       detectedBrand = null;
       return;
     }
 
     const brandChanged = detectedBrand !== brands[0];
     detectedBrand = brands[0];
-    campaignHint.textContent = '';
     campaignBrandEl.textContent = (SALES[detectedBrand] && SALES[detectedBrand].name) || detectedBrand;
+    uploadBtn.disabled = false;
 
     try {
       const res = await fetch(`/api/sales?saleId=${encodeURIComponent(detectedBrand)}`, {
@@ -393,7 +443,6 @@
       selectedCampaignId = null;
     }
     campaignSection.classList.remove('hidden');
-    conditionsSection.classList.remove('hidden');
     renderCampaignPicker();
   }
 

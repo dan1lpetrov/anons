@@ -17,8 +17,37 @@ function cartItemKey(item: Pick<CartItem, 'productId' | 'size' | 'colorId'>) {
   return `${item.productId}:${item.size}:${item.colorId}`;
 }
 
-export function useCart(products: Product[]) {
+// Self-sufficient: fetches only the handful of products actually in the cart (via GET
+// /api/products?ids=...), never the full catalog — so /cart and the header's item-count badge
+// don't depend on Home/Catalog having loaded anything. `shouldHydrate` further limits *when* that
+// fetch fires: totalItems/cartCount (shown in the header on every route) only need `items` itself,
+// not the product data, so callers pass true only while something needs price/enrichedItems (i.e.
+// on the /cart route itself) — otherwise a non-empty cart would trigger this fetch on every route.
+export function useCart(shouldHydrate: boolean) {
   const [items, setItems] = useState<CartItem[]>(loadCart);
+  const [products, setProducts] = useState<Product[]>([]);
+
+  const productIdsKey = useMemo(
+    () => [...new Set(items.map((i) => i.productId))].sort().join(','),
+    [items],
+  );
+
+  useEffect(() => {
+    if (!shouldHydrate || !productIdsKey) {
+      setProducts([]);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/products?ids=${encodeURIComponent(productIdsKey)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: unknown) => {
+        if (!cancelled && Array.isArray(data)) setProducts(data as Product[]);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [shouldHydrate, productIdsKey]);
 
   const getProductById = useCallback(
     (id: string) => products.find((p) => p.id === id),

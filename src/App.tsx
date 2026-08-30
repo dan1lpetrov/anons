@@ -16,31 +16,27 @@ import { Header } from './components/Header';
 import { Home } from './components/Home';
 import { OrderSuccess } from './components/OrderSuccess';
 import { ProductDetail } from './components/ProductDetail';
-import { products as seedProducts } from './data/products';
 import { useCart } from './hooks/useCart';
 import { TelegramContext, useTelegram } from './hooks/useTelegram';
-import type { Banner, Order, Product } from './types';
-import { getAvailableCategories } from './utils/catalog';
+import type { Banner, Order, Product, ProductsListResponse, ProductsMeta } from './types';
+import { categoriesFromMeta } from './utils/catalog';
 import { logProductEvent, logProductEvents } from './utils/events';
 import { createOrderId, getOrderFromLocalStorage, saveOrderToLocalStorage } from './utils/orderExport';
 import { getScrollContainer } from './utils/scroll';
 
 interface ProductRouteProps {
-  products: Product[];
-  isLoadingProducts: boolean;
+  product: Product | null;
+  isLoading: boolean;
   onAddToCart: (product: Product, size: string, colorId: string, quantity: number) => void;
   onBack: () => void;
   onShare: (product: Product) => void;
 }
 
-function ProductRoute({ products, isLoadingProducts, onAddToCart, onBack, onShare }: ProductRouteProps) {
-  const { id } = useParams<{ id: string }>();
-  const product = products.find((p) => p.id === id);
+function ProductRoute({ product, isLoading, onAddToCart, onBack, onShare }: ProductRouteProps) {
   if (!product) {
-    // A shared link hard-loads this route before the /api/products fetch
-    // resolves, so `products` is briefly empty — wait for it instead of
-    // bouncing straight to home, or a direct product link would never work.
-    if (isLoadingProducts) {
+    // A shared link hard-loads this route before its own /api/products?id= fetch resolves, so
+    // wait for it instead of bouncing straight to home, or a direct product link would never work.
+    if (isLoading) {
       return (
         <div className="product-detail-skeleton">
           <div className="skeleton-block product-detail-skeleton__image" />
@@ -72,35 +68,23 @@ function OrderRoute({ onContinue }: { onContinue: () => void }) {
 export default function App() {
   const telegram = useTelegram();
   const { tg, user, haptic, showAlert, openLink } = telegram;
-  const [products, setProducts] = useState<Product[]>(seedProducts);
-  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
-  const [banners, setBanners] = useState<Banner[]>([]);
-  const cart = useCart(products);
 
   const location = useLocation();
+  const cart = useCart(location.pathname === '/cart');
   const navigate = useNavigate();
   const navigationType = useNavigationType();
   const productMatch = useMatch('/product/:id');
-  const selectedProduct = useMemo(
-    () => products.find((p) => p.id === productMatch?.params.id),
-    [products, productMatch],
-  );
+  const productId = productMatch?.params.id;
 
+  // Fetched by App (rather than each route) because both Home and CatalogRoute need it, and
+  // fetching it once here — instead of duplicating it in both components — means switching
+  // between them doesn't refetch. Gated on route so /product/:id, /cart, /order/:id never pay
+  // for it at all. See useCatalogParams() note in CatalogRoute for why filters live in the URL.
+  const [banners, setBanners] = useState<Banner[]>([]);
+  const bannersFetchedRef = useRef(false);
   useEffect(() => {
-    let cancelled = false;
-    fetch('/api/products')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: unknown) => {
-        if (!cancelled && Array.isArray(data) && data.length > 0) setProducts(data as Product[]);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setIsLoadingProducts(false);
-      });
-    return () => { cancelled = true; };
-  }, []);
-
-  useEffect(() => {
+    if (location.pathname !== '/' || bannersFetchedRef.current) return;
+    bannersFetchedRef.current = true;
     let cancelled = false;
     fetch('/api/banners')
       .then((r) => (r.ok ? r.json() : null))
@@ -109,9 +93,63 @@ export default function App() {
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, []);
+  }, [location.pathname]);
 
-  const availableCategories = useMemo(() => getAvailableCategories(products), [products]);
+  const [meta, setMeta] = useState<ProductsMeta | null>(null);
+  const metaFetchedRef = useRef(false);
+  useEffect(() => {
+    const needsMeta = location.pathname === '/' || location.pathname.startsWith('/catalog');
+    if (!needsMeta || metaFetchedRef.current) return;
+    metaFetchedRef.current = true;
+    let cancelled = false;
+    fetch('/api/products?meta=1')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: ProductsMeta | null) => {
+        if (!cancelled && data) setMeta(data);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [location.pathname]);
+  const availableCategories = useMemo(() => (meta ? categoriesFromMeta(meta) : []), [meta]);
+
+  const [homeProducts, setHomeProducts] = useState<Product[]>([]);
+  const [isLoadingHomeProducts, setIsLoadingHomeProducts] = useState(true);
+  const homeProductsFetchedRef = useRef(false);
+  useEffect(() => {
+    if (location.pathname !== '/' || homeProductsFetchedRef.current) return;
+    homeProductsFetchedRef.current = true;
+    let cancelled = false;
+    fetch('/api/products?pageSize=10')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: ProductsListResponse | null) => {
+        if (!cancelled) setHomeProducts(data?.products ?? []);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setIsLoadingHomeProducts(false);
+      });
+    return () => { cancelled = true; };
+  }, [location.pathname]);
+
+  // Keyed by id rather than a plain boolean loading flag, so a product-to-product navigation
+  // (e.g. via "similar products") correctly shows a skeleton again instead of briefly rendering
+  // the previous product under the new id.
+  const [productFetch, setProductFetch] = useState<{ id: string; product: Product | null } | null>(null);
+  useEffect(() => {
+    if (!productId) return;
+    let cancelled = false;
+    fetch(`/api/products?id=${encodeURIComponent(productId)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: unknown) => {
+        if (!cancelled) setProductFetch({ id: productId, product: (data as Product | null) ?? null });
+      })
+      .catch(() => {
+        if (!cancelled) setProductFetch({ id: productId, product: null });
+      });
+    return () => { cancelled = true; };
+  }, [productId]);
+  const selectedProduct = productId && productFetch?.id === productId ? productFetch.product : null;
+  const isLoadingSelectedProduct = Boolean(productId) && productFetch?.id !== productId;
 
   // Scroll restoration for #root (the real scroll container — see utils/scroll.ts).
   // Continuously records the offset for whichever path is current, so whenever a
@@ -269,10 +307,10 @@ export default function App() {
               path="/"
               element={
                 <Home
-                  products={products}
+                  topProducts={homeProducts}
                   categories={availableCategories}
                   banners={banners}
-                  isLoading={isLoadingProducts}
+                  isLoading={isLoadingHomeProducts}
                   onOpenProduct={openProduct}
                   onViewCategory={(categoryId) => goTo(`/catalog/${encodeURIComponent(categoryId)}`)}
                   onViewSale={(saleId) => goTo(`/catalog?brands=${encodeURIComponent(saleId)}`)}
@@ -284,20 +322,14 @@ export default function App() {
                 />
               }
             />
-            <Route
-              path="/catalog"
-              element={<CatalogRoute products={products} isLoadingProducts={isLoadingProducts} onOpenProduct={openProduct} />}
-            />
-            <Route
-              path="/catalog/:categoryId"
-              element={<CatalogRoute products={products} isLoadingProducts={isLoadingProducts} onOpenProduct={openProduct} />}
-            />
+            <Route path="/catalog" element={<CatalogRoute meta={meta} onOpenProduct={openProduct} />} />
+            <Route path="/catalog/:categoryId" element={<CatalogRoute meta={meta} onOpenProduct={openProduct} />} />
             <Route
               path="/product/:id"
               element={
                 <ProductRoute
-                  products={products}
-                  isLoadingProducts={isLoadingProducts}
+                  product={selectedProduct}
+                  isLoading={isLoadingSelectedProduct}
                   onAddToCart={handleAddToCart}
                   onBack={goBack}
                   onShare={handleShareProduct}

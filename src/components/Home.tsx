@@ -1,11 +1,11 @@
 import { ChevronRight } from 'lucide-react';
-import type { Banner, Category, Product } from '../types';
+import type { Banner, CategoryWithImage, Product } from '../types';
 import { BannerCarousel } from './BannerCarousel';
 import { ProductCard } from './ProductCard';
 
 interface HomeProps {
-  products: Product[];
-  categories: Category[];
+  topProducts: Product[];
+  categories: CategoryWithImage[];
   banners: Banner[];
   isLoading: boolean;
   onOpenProduct: (id: string) => void;
@@ -15,11 +15,7 @@ interface HomeProps {
   onViewAll: () => void;
 }
 
-const TOP_PRODUCTS_COUNT = 10;
-
-export function Home({ products, categories, banners, isLoading, onOpenProduct, onViewCategory, onViewSale, onOpenLink, onViewAll }: HomeProps) {
-  const topProducts = products.slice(0, TOP_PRODUCTS_COUNT);
-
+export function Home({ topProducts, categories, banners, isLoading, onOpenProduct, onViewCategory, onViewSale, onOpenLink, onViewAll }: HomeProps) {
   return (
     <div className="home">
       <p className="catalog-intro">
@@ -73,20 +69,17 @@ export function Home({ products, categories, banners, isLoading, onOpenProduct, 
             <h2>Категорії</h2>
           </div>
           <div className="home-category-grid">
-            {categories.map((cat) => {
-              const image = products.find((p) => p.categoryId === cat.id)?.image;
-              return (
-                <button
-                  key={cat.id}
-                  type="button"
-                  className="home-category-tile"
-                  style={image ? { backgroundImage: `url(${image})` } : undefined}
-                  onClick={() => onViewCategory(cat.id)}
-                >
-                  <span className="home-category-tile__label">{cat.name}</span>
-                </button>
-              );
-            })}
+            {categories.map((cat) => (
+              <button
+                key={cat.id}
+                type="button"
+                className="home-category-tile"
+                style={cat.image ? { backgroundImage: `url(${cat.image})` } : undefined}
+                onClick={() => onViewCategory(cat.id)}
+              >
+                <span className="home-category-tile__label">{cat.name}</span>
+              </button>
+            ))}
           </div>
         </section>
       )}

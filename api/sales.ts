@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type { VercelPoolClient } from '@vercel/postgres';
 import { db, ensureSchema } from './_lib/db.js';
+import { purgeProductsCache } from './_lib/productQueries.js';
 import { requireAdmin } from './_lib/session.js';
 import { fetchUsdUahRate, NAMED_BANKS, type NamedBank } from './_lib/exchangeRates.js';
 import {
@@ -337,6 +338,9 @@ async function handlePost(req: VercelRequest, res: VercelResponse) {
         }
 
         await client.query('COMMIT');
+        // Purge unconditionally, not just when conditionsProvided: a plain active/end_date edit
+        // changes which products GET /api/products's WHERE clause returns at all.
+        await purgeProductsCache();
         return res.status(200).json({ ok: true, id: rows[0].id, ...(conditionsProvided ? { ...resolved, repricedCount } : {}) });
       } catch (error) {
         await client.query('ROLLBACK');
@@ -383,6 +387,7 @@ async function handlePostGlobal(body: Record<string, unknown>, res: VercelRespon
     await setSiteCurrency(currency, client);
     const repricedCount = await repriceAllProducts(client, currency);
     await client.query('COMMIT');
+    await purgeProductsCache();
     return res.status(200).json({ ok: true, ...currency, repricedCount });
   } catch (error) {
     await client.query('ROLLBACK');
@@ -406,6 +411,7 @@ async function handleDelete(req: VercelRequest, res: VercelResponse) {
     const { rowCount } = await client.query('DELETE FROM products WHERE sale_event_id = $1', [idParam]);
     await client.query('DELETE FROM sale_events WHERE id = $1', [idParam]);
     await client.query('COMMIT');
+    await purgeProductsCache();
     return res.status(200).json({ ok: true, removedProducts: rowCount });
   } catch (error) {
     await client.query('ROLLBACK');

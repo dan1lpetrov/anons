@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { db, ensureSchema } from './_lib/db.js';
+import { ensureSchema } from './_lib/db.js';
+import { fetchProductById } from './_lib/productQueries.js';
 import { renderShellWithMeta } from './_lib/renderShell.js';
 
 // Handles both /product/:id and /catalog/:categoryId (see vercel.json rewrites)
@@ -45,16 +46,7 @@ async function renderProduct(req: VercelRequest, res: VercelResponse, id: string
   if (id) {
     try {
       await ensureSchema();
-      const { rows } = await db.query<{ data: ProductData }>(
-        `SELECT p.data
-         FROM products p
-         JOIN sale_events se ON se.id = p.sale_event_id
-         WHERE p.id = $1 AND (se.active IS NOT FALSE) AND (se.end_date IS NULL OR se.end_date > now())
-         ORDER BY (p.data->>'price')::numeric ASC
-         LIMIT 1`,
-        [id],
-      );
-      product = rows[0]?.data ?? null;
+      product = (await fetchProductById(id)) as ProductData | null;
     } catch (error) {
       console.error(error);
     }

@@ -3,39 +3,143 @@ import { db, ensureSchema } from './_lib/db.js';
 import { requireAdmin } from './_lib/session.js';
 import { recordPriceChanges, repriceProductData, type ProductData, type SaleConditions } from './_lib/pricing.js';
 import { getSiteCurrency } from './_lib/siteSettings.js';
+import {
+  fetchProductById,
+  fetchProductsByIds,
+  purgeProductsCache,
+  setProductsCacheHeaders,
+} from './_lib/productQueries.js';
+
+const MAX_PAGE_SIZE = 60;
+const DEFAULT_PAGE_SIZE = 24;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   await ensureSchema();
 
-  if (req.method === 'GET') return handleGet(res);
+  if (req.method === 'GET') return handleGet(req, res);
   if (req.method === 'POST') return handlePost(req, res);
 
   res.setHeader('Allow', 'GET, POST');
   return res.status(405).json({ error: 'Method not allowed' });
 }
 
-async function handleGet(res: VercelResponse) {
+function csvParam(value: unknown): string[] | null {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const list = value.split(',').map((v) => v.trim()).filter(Boolean);
+  return list.length > 0 ? list : null;
+}
+
+async function handleGet(req: VercelRequest, res: VercelResponse) {
+  const idParam = req.query.id;
+  if (typeof idParam === 'string' && idParam) {
+    try {
+      const product = await fetchProductById(idParam);
+      setProductsCacheHeaders(res);
+      if (!product) return res.status(404).json({ error: 'Товар не знайдено' });
+      return res.status(200).json(product);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Не вдалося завантажити товар' });
+    }
+  }
+
+  const idsParam = csvParam(req.query.ids);
+  if (idsParam) {
+    try {
+      const products = await fetchProductsByIds(idsParam);
+      setProductsCacheHeaders(res);
+      return res.status(200).json(products);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Не вдалося завантажити товари' });
+    }
+  }
+
+  if (req.query.meta === '1') return handleGetMeta(res);
+
+  return handleGetList(req, res);
+}
+
+// One representative image + the distinct sizes present per category — small enough (one row
+// per category, not per product) to compute on every request without needing its own cache
+// bucket. Powers Home's category tiles and Catalog's size-facet chips (the client re-runs the
+// existing sizeKindForCategory/splitTallSizes/sortSizes bucketing over this — see
+// src/utils/catalog.ts — instead of duplicating that logic in SQL).
+async function handleGetMeta(res: VercelResponse) {
   try {
-    // A SKU can be live in more than one campaign at once (see CLAUDE.md's sales-lifecycle
-    // note) — DISTINCT ON collapses that to one row per product id, keeping the cheapest active
-    // price, before the outer query applies the usual score/featured-rank ordering.
-    const { rows } = await db.query<{ data: unknown }>(`
-      SELECT d.data
-      FROM (
+    const { rows } = await db.query<{ categoryId: string; image: string | null; sizes: string[] | null }>(`
+      SELECT p.category_id AS "categoryId",
+             (array_agg(p.data->>'image'))[1] AS image,
+             array_agg(DISTINCT size_elem) FILTER (WHERE size_elem IS NOT NULL) AS sizes
+      FROM products p
+      JOIN sale_events se ON se.id = p.sale_event_id
+      LEFT JOIN LATERAL jsonb_array_elements_text(p.data->'sizes') AS size_elem ON true
+      WHERE se.active IS NOT FALSE
+        AND (se.end_date IS NULL OR se.end_date > now())
+      GROUP BY p.category_id
+    `);
+    setProductsCacheHeaders(res);
+    return res.status(200).json({
+      categories: rows.map((r) => ({ id: r.categoryId, image: r.image })),
+      sizesByCategory: Object.fromEntries(rows.map((r) => [r.categoryId, r.sizes ?? []])),
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Не вдалося завантажити категорії' });
+  }
+}
+
+// Server-side pagination/filtering/sorting for the catalog — replaces what used to be a
+// client-side filter over the entire catalog (see CatalogRoute.tsx). Home also hits this branch
+// (no filters, small pageSize) for its top-N row instead of getting its own endpoint.
+async function handleGetList(req: VercelRequest, res: VercelResponse) {
+  const category = typeof req.query.category === 'string' && req.query.category !== 'all' ? req.query.category : null;
+  const brands = csvParam(req.query.brands);
+  const sizes = csvParam(req.query.sizes);
+  const rawQuery = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+  // Escape ILIKE wildcards in user input so e.g. a literal "%" or "_" in a search term is matched
+  // literally instead of acting as a pattern wildcard.
+  const searchLike = rawQuery ? `%${rawQuery.replace(/[%_]/g, (c) => `\\${c}`)}%` : null;
+  const sort = req.query.sort === 'price-asc' || req.query.sort === 'price-desc' ? req.query.sort : 'recommended';
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, Number(req.query.pageSize) || DEFAULT_PAGE_SIZE));
+  const offset = (page - 1) * pageSize;
+
+  const orderBy =
+    sort === 'price-asc'
+      ? `(d.data->>'price')::numeric ASC`
+      : sort === 'price-desc'
+        ? `(d.data->>'price')::numeric DESC`
+        : `s.score DESC NULLS LAST, d.featured_rank ASC, d.id ASC`;
+
+  try {
+    const { rows } = await db.query<{ data: unknown; total_count: string }>(
+      `
+      WITH filtered AS (
         SELECT DISTINCT ON (p.id) p.id, p.data, p.featured_rank
         FROM products p
         JOIN sale_events se ON se.id = p.sale_event_id
         WHERE se.active IS NOT FALSE
           AND (se.end_date IS NULL OR se.end_date > now())
+          AND ($1::text IS NULL OR p.category_id = $1)
+          AND ($2::text[] IS NULL OR p.sale_id = ANY($2))
+          AND ($3::text[] IS NULL OR p.data->'sizes' ?| $3)
+          AND ($4::text IS NULL OR p.data->>'name' ILIKE $4 ESCAPE '\\' OR p.data->>'description' ILIKE $4 ESCAPE '\\')
         ORDER BY p.id, (p.data->>'price')::numeric ASC
-      ) d
+      )
+      SELECT d.data, count(*) OVER() AS total_count
+      FROM filtered d
       LEFT JOIN product_scores s ON s.product_id = d.id
-      ORDER BY s.score DESC NULLS LAST, d.featured_rank ASC, d.id ASC
-    `);
-    // Score only changes on the cron cadence (see CLAUDE.md), so this can be cached briefly
-    // instead of the max-age=0 the old featured_rank-only ordering needed.
-    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
-    return res.status(200).json(rows.map((row) => row.data));
+      ORDER BY ${orderBy}
+      LIMIT $5 OFFSET $6
+      `,
+      [category, brands, sizes, searchLike, pageSize, offset],
+    );
+    setProductsCacheHeaders(res);
+    return res.status(200).json({
+      products: rows.map((row) => row.data),
+      totalCount: rows.length > 0 ? Number(rows[0].total_count) : 0,
+    });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: 'Не вдалося завантажити товари' });
@@ -132,6 +236,7 @@ async function handlePost(req: VercelRequest, res: VercelResponse) {
     );
 
     await client.query('COMMIT');
+    await purgeProductsCache();
     return res.status(200).json({ ok: true, count: products.length, uploadedBy: email });
   } catch (error) {
     await client.query('ROLLBACK');

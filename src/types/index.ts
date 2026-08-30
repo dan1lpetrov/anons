@@ -77,17 +77,26 @@ export interface Order {
   telegramUser?: TelegramWebAppUser;
 }
 
-export type CatalogContext =
-  | { mode: 'all' }
-  | { mode: 'category'; categoryId: CategoryId }
-  | { mode: 'sale'; saleId: SaleId };
-
 export type SortOption = 'recommended' | 'price-desc' | 'price-asc';
 
 export interface CatalogFilters {
   search: string;
   sizes: string[];
   brands: SaleId[];
+}
+
+export interface ProductsMeta {
+  categories: Array<{ id: CategoryId; image: string | null }>;
+  sizesByCategory: Record<CategoryId, string[]>;
+}
+
+export interface CategoryWithImage extends Category {
+  image: string | null;
+}
+
+export interface ProductsListResponse {
+  products: Product[];
+  totalCount: number;
 }
 
 export interface Banner {

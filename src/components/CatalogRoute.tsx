@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SearchX } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import type { CategoryId, Product } from '../types';
+import type { CategoryId, Product, ProductsListResponse, ProductsMeta } from '../types';
 import { sales } from '../data/sales';
 import { useCatalogParams } from '../hooks/useCatalogParams';
 import { useTelegramContext } from '../hooks/useTelegram';
-import { filterAndSortProducts, getAvailableCategories, getAvailableSizes } from '../utils/catalog';
+import { categoriesFromMeta, getAvailableSizes } from '../utils/catalog';
 import { getScrollContainer } from '../utils/scroll';
 import { CatalogControls } from './CatalogControls';
 import { CategoryFilter } from './CategoryFilter';
@@ -15,38 +15,64 @@ import { ProductCard, type ProductDebugStats } from './ProductCard';
 const PAGE_SIZE = 24;
 
 interface CatalogRouteProps {
-  products: Product[];
-  isLoadingProducts: boolean;
+  meta: ProductsMeta | null;
   onOpenProduct: (id: string) => void;
 }
 
-export function CatalogRoute({ products, isLoadingProducts, onOpenProduct }: CatalogRouteProps) {
+export function CatalogRoute({ meta, onOpenProduct }: CatalogRouteProps) {
   const navigate = useNavigate();
   const { haptic } = useTelegramContext();
   const { category, filters, sort, page, setFilters, setSort, setPage, resetFilters } = useCatalogParams();
 
-  const catalogContext = useMemo(
-    () => (category === 'all' ? { mode: 'all' as const } : { mode: 'category' as const, categoryId: category }),
-    [category],
+  const [products, setProducts] = useState<Product[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoading(true);
+    const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE), sort });
+    if (category !== 'all') params.set('category', category);
+    if (filters.search) params.set('q', filters.search);
+    if (filters.sizes.length) params.set('sizes', filters.sizes.join(','));
+    if (filters.brands.length) params.set('brands', filters.brands.join(','));
+
+    fetch(`/api/products?${params.toString()}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: ProductsListResponse | null) => {
+        if (cancelled) return;
+        setProducts(data?.products ?? []);
+        setTotalCount(data?.totalCount ?? 0);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setProducts([]);
+          setTotalCount(0);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [category, filters.search, filters.sizes, filters.brands, sort, page]);
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+
+  const availableSizes = useMemo(
+    () => (meta ? getAvailableSizes(meta.sizesByCategory, category) : { clothing: { regular: [], tall: [] }, shoes: [], accessories: [] }),
+    [meta, category],
   );
-  const filteredProducts = useMemo(
-    () => filterAndSortProducts(products, catalogContext, filters, sort),
-    [products, catalogContext, filters, sort],
-  );
-  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const pagedProducts = useMemo(
-    () => filteredProducts.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
-    [filteredProducts, currentPage],
-  );
+  const availableCategories = useMemo(() => (meta ? categoriesFromMeta(meta) : []), [meta]);
 
   // Admin-only ranking diagnostics for the catalog grid (see CLAUDE.md "Product ranking score").
   // /api/debug/product-score 401s for non-admins, so debugStats just stays empty for regular visitors.
   const [debugStats, setDebugStats] = useState<Record<string, ProductDebugStats>>({});
   useEffect(() => {
-    if (pagedProducts.length === 0) return;
+    if (products.length === 0) return;
     let cancelled = false;
-    const ids = pagedProducts.map((p) => p.id).join(',');
+    const ids = products.map((p) => p.id).join(',');
     fetch(`/api/debug/product-score?productIds=${encodeURIComponent(ids)}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data: Record<string, ProductDebugStats> | null) => {
@@ -56,7 +82,7 @@ export function CatalogRoute({ products, isLoadingProducts, onOpenProduct }: Cat
     return () => {
       cancelled = true;
     };
-  }, [pagedProducts]);
+  }, [products]);
 
   const isFirstPageRender = useRef(true);
   useEffect(() => {
@@ -65,13 +91,7 @@ export function CatalogRoute({ products, isLoadingProducts, onOpenProduct }: Cat
       return;
     }
     getScrollContainer().scrollTo({ top: 0, behavior: 'smooth' });
-  }, [currentPage]);
-
-  const selectableProducts = useMemo(
-    () => (category === 'all' ? products : products.filter((product) => product.categoryId === category)),
-    [products, category],
-  );
-  const availableCategories = useMemo(() => getAvailableCategories(products), [products]);
+  }, [page]);
 
   const changeCategory = (next: CategoryId | 'all') => {
     haptic('light');
@@ -85,14 +105,14 @@ export function CatalogRoute({ products, isLoadingProducts, onOpenProduct }: Cat
         <CatalogControls
           filters={filters}
           sort={sort}
-          sizes={getAvailableSizes(selectableProducts)}
+          sizes={availableSizes}
           brands={sales}
-          resultCount={filteredProducts.length}
+          resultCount={totalCount}
           onFiltersChange={setFilters}
           onSortChange={setSort}
           onReset={resetFilters}
         >
-          {isLoadingProducts ? (
+          {isLoading ? (
             <div className="product-grid">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="product-card product-card--skeleton">
@@ -105,10 +125,10 @@ export function CatalogRoute({ products, isLoadingProducts, onOpenProduct }: Cat
                 </div>
               ))}
             </div>
-          ) : filteredProducts.length ? (
+          ) : products.length ? (
             <>
               <div className="product-grid">
-                {pagedProducts.map((product) => (
+                {products.map((product) => (
                   <ProductCard
                     key={product.id}
                     product={product}
@@ -117,7 +137,7 @@ export function CatalogRoute({ products, isLoadingProducts, onOpenProduct }: Cat
                   />
                 ))}
               </div>
-              <Pagination page={currentPage} totalPages={totalPages} onChange={setPage} />
+              <Pagination page={Math.min(page, totalPages)} totalPages={totalPages} onChange={setPage} />
             </>
           ) : (
             <div className="empty-state"><SearchX className="empty-state__icon" size={40} strokeWidth={1.5} aria-hidden="true" /><h2>Нічого не знайдено</h2><p>Спробуйте змінити параметри пошуку або фільтри.</p></div>

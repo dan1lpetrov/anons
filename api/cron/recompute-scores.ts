@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, ensureSchema } from '../_lib/db.js';
 import { effectiveOriginalPrice, effectivePrice, type ProductData } from '../_lib/pricing.js';
+import { purgeProductsCache } from '../_lib/productQueries.js';
 import { requireAdmin } from '../_lib/session.js';
 import { getWeights } from '../_lib/weights.js';
 
@@ -62,6 +63,7 @@ async function recompute(): Promise<{ scored: number; similarPairs: number }> {
   if (products.length === 0) {
     await db.query('TRUNCATE TABLE product_scores');
     await db.query('TRUNCATE TABLE product_similar');
+    await purgeProductsCache();
     return { scored: 0, similarPairs: 0 };
   }
 
@@ -202,6 +204,7 @@ async function recompute(): Promise<{ scored: number; similarPairs: number }> {
     }
 
     await client.query('COMMIT');
+    await purgeProductsCache();
     return { scored: scores.length, similarPairs: similarRows.length };
   } catch (error) {
     await client.query('ROLLBACK');

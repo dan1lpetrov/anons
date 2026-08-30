@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, ensureSchema } from './_lib/db.js';
+import { getSiteCurrency } from './_lib/siteSettings.js';
 
 interface PricePoint {
   price: number;
@@ -37,7 +38,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const price = color?.price ?? product?.price;
     const originalPrice = color?.originalPrice;
 
-    const points: PricePoint[] = rows.map((r) => ({ price: Number(r.price), recordedAt: r.recorded_at }));
+    // price_history stores the pre-FX price (see CLAUDE.md) so a currency/rate change never
+    // logs as a fake price change — convert to the site's current display currency here, the
+    // same way repriceProductData does, so the chart's numbers match what's shown everywhere
+    // else instead of showing the raw base-currency figure under a mismatched ₴/$ label.
+    const siteCurrency = await getSiteCurrency();
+    const toDisplay = (n: number) =>
+      siteCurrency.displayCurrency === 'uah' && siteCurrency.uahRate ? Math.round(n * siteCurrency.uahRate * 100) / 100 : n;
+
+    const points: PricePoint[] = rows.map((r) => ({ price: toDisplay(Number(r.price)), recordedAt: r.recorded_at }));
 
     // No recorded history yet — synthesize an original-price -> current-price
     // pair so the chart still has something to draw for a discounted product.

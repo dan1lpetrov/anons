@@ -88,9 +88,19 @@ export interface DisplayCurrency {
 // price × (1 − discount%) × (1 + commission%), then × rate if the site displays in UAH. This is
 // the single place this formula lives — every price shown anywhere on the site or in admin
 // traces back to a call to repriceProductData below, which calls this per field.
-function applySaleMarkup(basePrice: number | undefined, cond: SaleConditions, currency: DisplayCurrency): number | undefined {
+//
+// originalPrice skips the discount step (skipDiscount: true): additionalDiscountPercent is a
+// temporary reseller markdown off the current price, not something that existed back when
+// baseOriginalPrice was the price — only the buyer commission (which the reseller always adds,
+// regardless of the temporary discount) applies to it.
+function applySaleMarkup(
+  basePrice: number | undefined,
+  cond: SaleConditions,
+  currency: DisplayCurrency,
+  opts?: { skipDiscount?: boolean },
+): number | undefined {
   if (typeof basePrice !== 'number') return undefined;
-  let p = basePrice * (1 - cond.additionalDiscountPercent / 100);
+  let p = opts?.skipDiscount ? basePrice : basePrice * (1 - cond.additionalDiscountPercent / 100);
   p = p * (1 + cond.buyerCommissionPercent / 100);
   if (currency.displayCurrency === 'uah' && currency.uahRate) p = p * currency.uahRate;
   return Math.round(p * 100) / 100;
@@ -114,7 +124,7 @@ export function repriceProductData<T extends ProductData>(data: T, cond: SaleCon
     baseOriginalPrice,
     currency: currency.displayCurrency === 'uah' ? 'UAH' : 'USD',
     price: applySaleMarkup(basePrice, cond, currency),
-    originalPrice: applySaleMarkup(baseOriginalPrice, cond, currency),
+    originalPrice: applySaleMarkup(baseOriginalPrice, cond, currency, { skipDiscount: true }),
     colors: (data.colors ?? []).map((c) => {
       const cBasePrice = typeof c.basePrice === 'number' ? c.basePrice : (c.price as number | undefined);
       const cBaseOriginalPrice =
@@ -123,7 +133,10 @@ export function repriceProductData<T extends ProductData>(data: T, cond: SaleCon
         ...c,
         ...(cBasePrice !== undefined ? { basePrice: cBasePrice, price: applySaleMarkup(cBasePrice, cond, currency) } : {}),
         ...(cBaseOriginalPrice !== undefined
-          ? { baseOriginalPrice: cBaseOriginalPrice, originalPrice: applySaleMarkup(cBaseOriginalPrice, cond, currency) }
+          ? {
+              baseOriginalPrice: cBaseOriginalPrice,
+              originalPrice: applySaleMarkup(cBaseOriginalPrice, cond, currency, { skipDiscount: true }),
+            }
           : {}),
       };
     }),

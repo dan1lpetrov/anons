@@ -17,10 +17,11 @@ const HEIGHT = 64;
 const PAD_X = 16;
 const PAD_TOP = 8;
 const PAD_BOTTOM = 8;
-// With exactly two points (the common cold-start case), stretching them to
-// the full width reads as a long timeline when it's really just "before/after" —
-// keep them a fixed distance apart instead and leave the rest of the chart empty.
-const TWO_POINT_GAP = 100;
+// Each point holds its price until the next change (or, for the last point,
+// until now) — so there's one band per point, not one band per gap between
+// points. A band's natural width is fixed; only once there are enough points
+// that their bands would overflow the plot do we compress them to fit.
+const BAND_GAP = 64;
 // Give the highest/lowest price some breathing room from the top/bottom edges
 // instead of the extreme dots sitting flush on the gridlines.
 const VALUE_PAD_RATIO = 0.18;
@@ -84,7 +85,6 @@ export function PriceHistoryChart({ points, currency }: PriceHistoryChartProps) 
   const scaleSpan = span + valuePad * 2;
   const plotHeight = HEIGHT - PAD_TOP - PAD_BOTTOM;
   const plotWidth = WIDTH - PAD_X * 2;
-  const isPair = points.length === 2;
 
   const yFor = (price: number) => PAD_TOP + plotHeight - ((price - scaleMin) / scaleSpan) * plotHeight;
 
@@ -94,27 +94,27 @@ export function PriceHistoryChart({ points, currency }: PriceHistoryChartProps) 
   // an hourly chart — even spacing shows the sequence of changes without
   // exaggerating (or hiding) the real gaps between them. Dates in the
   // tooltip/axis labels still come from the real `recordedAt`.
-  const coords = points.map((p, i) => {
-    let x: number;
-    if (isPair) {
-      x = i === 0 ? PAD_X : PAD_X + TWO_POINT_GAP;
-    } else {
-      const xFrac = i / (points.length - 1);
-      x = PAD_X + xFrac * plotWidth;
-    }
-    return { ...p, x, y: yFor(p.price) };
-  });
+  //
+  // There are `points.length` bands (one per point, including a trailing one
+  // for the current/latest price), so the natural width is measured in bands,
+  // not gaps-between-points.
+  const bandCount = points.length;
+  const gap = bandCount * BAND_GAP <= plotWidth ? BAND_GAP : plotWidth / bandCount;
+  const coords = points.map((p, i) => ({ ...p, x: PAD_X + i * gap, y: yFor(p.price) }));
+  const virtualEndX = PAD_X + bandCount * gap;
 
   // The dot marker sits in the middle of the flat band it represents (from
-  // its own transition to the next one) instead of at the band's left edge —
-  // the last point has no following band, so it stays at its true position.
-  const markerX = coords.map((c, i) => (i === coords.length - 1 ? c.x : (c.x + coords[i + 1].x) / 2));
+  // its own transition to the next one, or — for the last point — to the
+  // present moment) instead of at the band's left edge.
+  const markerX = coords.map((c, i) => (i === coords.length - 1 ? (c.x + virtualEndX) / 2 : (c.x + coords[i + 1].x) / 2));
 
-  // Step-after path: price holds at its value until the moment it changes.
+  // Step-after path: price holds at its value until the moment it changes,
+  // then holds flat one more band's width to represent "still the price now".
   let stepPath = `M ${coords[0].x} ${coords[0].y}`;
   for (let i = 1; i < coords.length; i++) {
     stepPath += ` L ${coords[i].x} ${coords[i - 1].y} L ${coords[i].x} ${coords[i].y}`;
   }
+  stepPath += ` L ${virtualEndX} ${coords[coords.length - 1].y}`;
 
   const maxY = yFor(max);
   const minY = yFor(min);
@@ -188,7 +188,10 @@ export function PriceHistoryChart({ points, currency }: PriceHistoryChartProps) 
       </div>
       <div className="price-history__axis">
         {coords.map((c, i) => {
-          if (!tickIndices.includes(i)) return null;
+          // The synthetic "original price" point has no real recorded date —
+          // showing the literal fallback text ("було") as an axis label reads
+          // as a stray word rather than a date, so just leave that tick blank.
+          if (!tickIndices.includes(i) || !c.recordedAt) return null;
           const align = i === 0 ? 'left' : i === coords.length - 1 ? 'right' : 'center';
           return (
             <span

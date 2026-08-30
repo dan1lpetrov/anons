@@ -598,7 +598,12 @@
 
   AdminShared.init('banners').then((email) => {
     if (email) {
-      loadOptions().then(loadBanners);
+      // Run concurrently, not loadOptions().then(loadBanners) — loadOptions fetches the whole
+      // product catalog just to derive category names, which can be slow, and there's no reason
+      // the banner list itself should sit blocked behind that. Whichever finishes first renders
+      // first; a final re-render after both settle fixes up any card whose category/sale
+      // dropdown was built before loadOptions had populated the real option lists.
+      Promise.all([loadOptions(), loadBanners()]).then(() => renderBanners());
     }
   });
 </script>

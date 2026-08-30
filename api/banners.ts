@@ -82,7 +82,10 @@ async function handleGet(req: VercelRequest, res: VercelResponse) {
     const { rows } = await db.query<BannerRow>(
       `SELECT ${SELECT_COLUMNS} FROM banners WHERE active = true ORDER BY sort_order ASC, id ASC`,
     );
-    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+    // Short compared to /api/products' 60s — banners are now reordered casually via
+    // drag-and-drop in the admin, so a change should read back on the storefront in
+    // roughly the time it takes to alt-tab over and reload, not up to a minute.
+    res.setHeader('Cache-Control', 'public, max-age=15, stale-while-revalidate=60');
     return res.status(200).json(rows);
   } catch (error) {
     console.error(error);

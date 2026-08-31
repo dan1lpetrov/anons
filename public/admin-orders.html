@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Anons — Замовлення</title>
+<script>(function(){try{var t=localStorage.getItem('anons-admin-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/assets/admin.css" />
+</head>
+<body>
+
+<div id="loginScreen" class="login-screen hidden">
+  <div class="login-screen__box">
+    <h1>Anons Admin</h1>
+    <p class="hint">Потрібен вхід через Google-акаунт адміністратора.</p>
+    <a class="button primary" href="/admin">Перейти до входу</a>
+  </div>
+</div>
+
+<div id="app" class="admin-shell hidden">
+  <div id="nav"></div>
+  <main class="admin-content">
+    <div class="admin-content__inner admin-content__inner--wide">
+      <div class="row" style="justify-content: space-between;">
+        <h1>Замовлення</h1>
+        <div class="row">
+          <input type="search" id="searchInput" placeholder="Пошук за id, іменем, username..." style="width: 260px;" />
+          <button id="reloadOrders" class="secondary" type="button">Оновити</button>
+        </div>
+      </div>
+
+      <div class="range-pills" id="statusFilter">
+        <button class="range-pill active" type="button" data-filter="all">Всі</button>
+        <button class="range-pill" type="button" data-filter="unpaid">Неоплачені</button>
+        <button class="range-pill" type="button" data-filter="paid">Оплачені</button>
+        <button class="range-pill" type="button" data-filter="redeemed">Викуплені</button>
+      </div>
+
+      <div id="orderList" class="item-list"></div>
+      <div id="listStatus" class="status"></div>
+    </div>
+  </main>
+</div>
+
+<script src="/assets/admin.js"></script>
+<script>
+  const orderList = document.getElementById('orderList');
+  const listStatus = document.getElementById('listStatus');
+  const searchInput = document.getElementById('searchInput');
+  const statusFilter = document.getElementById('statusFilter');
+  const reloadOrdersBtn = document.getElementById('reloadOrders');
+
+  let currentFilter = 'all';
+  let currentOrders = [];
+  const detailCache = new Map(); // orderId -> full order (with items), refetched on save
+  let expandedOrderId = null;
+
+  function escapeHtml(str) {
+    return String(str ?? '').replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+  }
+
+  function currencySymbol(currency) {
+    return currency === 'UAH' ? '₴' : '$';
+  }
+
+  function formatAmount(value, currency) {
+    const n = Number(value) || 0;
+    return currency === 'UAH' ? Math.round(n) : n;
+  }
+
+  function fmtPrice(value, currency) {
+    return `${formatAmount(value, currency)} ${currencySymbol(currency)}`;
+  }
+
+  function fmtDateTime(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleString('uk-UA', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+
+  function buyerLabel(o) {
+    if (o.telegramUsername) return '@' + o.telegramUsername;
+    const name = [o.telegramFirstName, o.telegramLastName].filter(Boolean).join(' ');
+    return name ? `${name} (без username)` : 'Невідомий покупець';
+  }
+
+  function buyerSubtitle(o) {
+    const parts = [];
+    if (o.telegramUsername) {
+      const name = [o.telegramFirstName, o.telegramLastName].filter(Boolean).join(' ');
+      if (name) parts.push(name);
+    }
+    if (o.telegramUserId) parts.push(`ID ${o.telegramUserId}`);
+    return parts.join(' · ') || '—';
+  }
+
+  // --- List ---
+
+  async function loadOrders() {
+    AdminShared.setStatus(listStatus, 'pending', 'Завантаження...');
+    try {
+      const params = new URLSearchParams();
+      if (currentFilter === 'unpaid') params.set('paid', '0');
+      if (currentFilter === 'paid') params.set('paid', '1');
+      if (currentFilter === 'redeemed') params.set('redeemed', '1');
+      const q = searchInput.value.trim();
+      if (q) params.set('q', q);
+
+      const res = await fetch(`/api/orders?${params.toString()}`, { cache: 'no-store', credentials: 'include' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      currentOrders = await res.json();
+      renderOrders();
+      listStatus.className = 'status';
+    } catch (err) {
+      AdminShared.setStatus(listStatus, 'err', 'Помилка: ' + err.message);
+    }
+  }
+
+  function renderOrders() {
+    orderList.innerHTML = '';
+    if (currentOrders.length === 0) {
+      orderList.innerHTML = `<div class="empty-state">${AdminShared.icon('inbox', 32)}<p>Замовлень не знайдено.</p></div>`;
+      return;
+    }
+    currentOrders.forEach((o) => orderList.appendChild(buildOrderCard(o)));
+  }
+
+  function buildOrderCard(o) {
+    const card = document.createElement('section');
+    card.className = 'item-card';
+    card.dataset.orderId = o.id;
+
+    const telegramBtn = o.telegramUsername
+      ? `<a class="secondary" style="text-decoration:none;" target="_blank" rel="noopener" href="https://t.me/${encodeURIComponent(o.telegramUsername)}">Написати в Telegram</a>`
+      : '';
+
+    card.innerHTML = `
+      <div class="item-card__row">
+        <div class="item-card__identity">
+          <span class="item-card__name">${escapeHtml(buyerLabel(o))}</span>
+          <span class="item-card__subtitle">${escapeHtml(buyerSubtitle(o))} · № ${escapeHtml(o.id)}</span>
+        </div>
+        <div class="item-card__meta">
+          <div class="meta-item"><span>Дата</span><b>${fmtDateTime(o.createdAt)}</b></div>
+          <div class="meta-item"><span>Позицій</span><b>${o.itemCount}</b></div>
+          <div class="meta-item"><span>Сума</span><b>${fmtPrice(o.total, o.currency)}</b></div>
+          <span class="badge ${o.paid ? 'success' : 'neutral'}">${o.paid ? 'Оплачено' : 'Не оплачено'}</span>
+          <span class="badge ${o.redeemed ? 'success' : 'neutral'}">${o.redeemed ? 'Викуплено' : 'Не викуплено'}</span>
+        </div>
+        <div class="item-card__actions">
+          ${telegramBtn}
+          <button type="button" class="icon-btn edit-toggle" title="Деталі">${AdminShared.icon('pencil', 14)}</button>
+        </div>
+      </div>
+      <div class="item-card__panel item-card__edit">
+        <div class="order-detail" data-loading="1"><p class="hint">Завантаження деталей...</p></div>
+      </div>
+    `;
+
+    const editToggleBtn = card.querySelector('.edit-toggle');
+    editToggleBtn.addEventListener('click', () => {
+      const isOpen = card.classList.contains('is-editing');
+      if (isOpen) {
+        card.classList.remove('is-editing');
+        expandedOrderId = null;
+        return;
+      }
+      card.classList.add('is-editing');
+      expandedOrderId = o.id;
+      loadOrderDetail(o, card);
+    });
+
+    if (expandedOrderId === o.id) {
+      card.classList.add('is-editing');
+      loadOrderDetail(o, card);
+    }
+
+    return card;
+  }
+
+  // --- Detail / edit panel ---
+
+  async function loadOrderDetail(orderSummary, card) {
+    const container = card.querySelector('.order-detail');
+    try {
+      const res = await fetch(`/api/orders?id=${encodeURIComponent(orderSummary.id)}`, { cache: 'no-store', credentials: 'include' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      const order = await res.json();
+      detailCache.set(order.id, order);
+      renderOrderDetail(order, container);
+    } catch (err) {
+      container.innerHTML = `<p class="status err">Помилка: ${escapeHtml(err.message)}</p>`;
+    }
+  }
+
+  function lineTotal(item) {
+    return item.quantity * item.unitPrice;
+  }
+
+  function renderOrderDetail(order, container) {
+    // Local working copy — edits (add/remove/qty) only touch this until "Зберегти".
+    const items = order.items.map((i) => ({ ...i }));
+
+    container.dataset.loading = '';
+    container.innerHTML = `
+      ${order.comment ? `<p class="item-card__hint"><b>Коментар покупця:</b> ${escapeHtml(order.comment)}</p>` : ''}
+      <table class="dash-table order-items-table">
+        <thead><tr><th>Товар</th><th>Розмір</th><th>Колір</th><th class="num">К-сть</th><th class="num">Ціна</th><th class="num">Сума</th><th></th></tr></thead>
+        <tbody class="order-items-body"></tbody>
+      </table>
+
+      <div class="field-grid item-form-grid" style="margin-top: 12px;">
+        <div class="field field-span-2">
+          <label>Додати товар (пошук за назвою)</label>
+          <input type="search" class="f-product-search" placeholder="Почни вводити назву товару..." />
+        </div>
+      </div>
+      <div class="product-search-results"></div>
+
+      <div class="field-grid item-form-grid" style="margin-top: 16px;">
+        <div class="field">
+          <label>Статус</label>
+          <div class="status-toggle">
+            <label class="switch"><input type="checkbox" class="f-paid" ${order.paid ? 'checked' : ''} /><span class="switch-track"></span></label>
+            <span class="status-toggle__word ${order.paid ? 'active-text' : 'paused-text'}">Оплачено</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>&nbsp;</label>
+          <div class="status-toggle">
+            <label class="switch"><input type="checkbox" class="f-redeemed" ${order.redeemed ? 'checked' : ''} /><span class="switch-track"></span></label>
+            <span class="status-toggle__word ${order.redeemed ? 'active-text' : 'paused-text'}">Викуплено</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="item-form-footer">
+        <span></span>
+        <div class="row">
+          <button type="button" class="primary save-order-btn">Зберегти</button>
+        </div>
+      </div>
+      <div class="status detail-status"></div>
+    `;
+
+    const itemsBody = container.querySelector('.order-items-body');
+    const searchInputEl = container.querySelector('.f-product-search');
+    const resultsEl = container.querySelector('.product-search-results');
+    const paidInput = container.querySelector('.f-paid');
+    const redeemedInput = container.querySelector('.f-redeemed');
+    const saveBtn = container.querySelector('.save-order-btn');
+    const detailStatus = container.querySelector('.detail-status');
+
+    [paidInput, redeemedInput].forEach((input) => {
+      input.addEventListener('change', () => {
+        const word = input.parentElement.nextElementSibling;
+        word.className = 'status-toggle__word ' + (input.checked ? 'active-text' : 'paused-text');
+      });
+    });
+
+    function renderItems() {
+      itemsBody.innerHTML = items
+        .map(
+          (item, idx) => `
+        <tr>
+          <td>${escapeHtml(item.productName)}</td>
+          <td>${escapeHtml(item.size)}</td>
+          <td>${escapeHtml(item.colorName || '—')}</td>
+          <td class="num"><input type="number" min="1" class="f-qty" data-idx="${idx}" value="${item.quantity}" style="width: 56px; text-align: right;" /></td>
+          <td class="num">${fmtPrice(item.unitPrice, order.currency)}</td>
+          <td class="num">${fmtPrice(lineTotal(item), order.currency)}</td>
+          <td><button type="button" class="icon-btn danger f-remove" data-idx="${idx}" title="Прибрати">${AdminShared.icon('trash', 14)}</button></td>
+        </tr>
+      `,
+        )
+        .join('');
+
+      itemsBody.querySelectorAll('.f-qty').forEach((input) => {
+        input.addEventListener('change', () => {
+          const idx = Number(input.dataset.idx);
+          const qty = Math.max(1, Number(input.value) || 1);
+          items[idx].quantity = qty;
+          renderItems();
+        });
+      });
+      itemsBody.querySelectorAll('.f-remove').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          items.splice(Number(btn.dataset.idx), 1);
+          renderItems();
+        });
+      });
+    }
+    renderItems();
+
+    // --- Add product ---
+    let searchTimer = null;
+    searchInputEl.addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      const q = searchInputEl.value.trim();
+      if (!q) {
+        resultsEl.innerHTML = '';
+        return;
+      }
+      searchTimer = setTimeout(() => runProductSearch(q), 300);
+    });
+
+    async function runProductSearch(q) {
+      resultsEl.innerHTML = '<p class="hint">Пошук...</p>';
+      try {
+        const res = await fetch(`/api/products?q=${encodeURIComponent(q)}&pageSize=8`, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const { products } = await res.json();
+        if (products.length === 0) {
+          resultsEl.innerHTML = '<p class="hint">Нічого не знайдено.</p>';
+          return;
+        }
+        resultsEl.innerHTML = products
+          .map(
+            (p) => `
+          <div class="item-card product-search-result" data-id="${escapeHtml(p.id)}">
+            <div class="item-card__row">
+              <img src="${escapeHtml(p.image)}" alt="" style="width: 36px; height: 36px; object-fit: cover; border-radius: 6px;" />
+              <div class="item-card__identity">
+                <span class="item-card__name">${escapeHtml(p.name)}</span>
+                <span class="item-card__subtitle">${fmtPrice(p.price, p.currency)}</span>
+              </div>
+              <div class="item-card__actions">
+                <button type="button" class="secondary f-pick" data-id="${escapeHtml(p.id)}">Обрати</button>
+              </div>
+            </div>
+            <div class="item-card__panel item-card__edit product-pick-panel"></div>
+          </div>
+        `,
+          )
+          .join('');
+
+        resultsEl.querySelectorAll('.f-pick').forEach((btn) => {
+          btn.addEventListener('click', () => openPickPanel(btn.dataset.id, btn.closest('.product-search-result')));
+        });
+      } catch (err) {
+        resultsEl.innerHTML = `<p class="status err">Помилка пошуку: ${escapeHtml(err.message)}</p>`;
+      }
+    }
+
+    async function openPickPanel(productId, resultCard) {
+      const panel = resultCard.querySelector('.product-pick-panel');
+      resultCard.classList.add('is-editing');
+      panel.innerHTML = '<p class="hint">Завантаження...</p>';
+      try {
+        const res = await fetch(`/api/products?id=${encodeURIComponent(productId)}`, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const product = await res.json();
+
+        panel.innerHTML = `
+          <div class="field-grid item-form-grid">
+            <div class="field">
+              <label>Колір</label>
+              <select class="f-color">
+                ${product.colors.map((c) => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')}
+              </select>
+            </div>
+            <div class="field">
+              <label>Розмір</label>
+              <select class="f-size"></select>
+            </div>
+            <div class="field">
+              <label>Кількість</label>
+              <input type="number" class="f-qty-new" min="1" value="1" />
+            </div>
+          </div>
+          <div class="item-form-footer">
+            <span></span>
+            <button type="button" class="primary f-confirm-add">Додати в замовлення</button>
+          </div>
+        `;
+
+        const colorSelect = panel.querySelector('.f-color');
+        const sizeSelect = panel.querySelector('.f-size');
+
+        function fillSizes() {
+          const color = product.colors.find((c) => c.id === colorSelect.value) || product.colors[0];
+          const sizes = (color && color.sizes && color.sizes.length ? color.sizes : product.sizes) || [];
+          sizeSelect.innerHTML = sizes.map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+        }
+        colorSelect.addEventListener('change', fillSizes);
+        fillSizes();
+
+        panel.querySelector('.f-confirm-add').addEventListener('click', () => {
+          const color = product.colors.find((c) => c.id === colorSelect.value) || product.colors[0];
+          const unitPrice = (color && color.price != null ? color.price : product.price) ?? 0;
+          items.push({
+            productId: product.id,
+            productName: product.name,
+            productImage: (color && color.images && color.images[0]) || product.image,
+            sourceName: product.sourceName,
+            sourceUrl: product.sourceUrl,
+            size: sizeSelect.value,
+            colorId: color ? color.id : null,
+            colorName: color ? color.name : null,
+            quantity: Math.max(1, Number(panel.querySelector('.f-qty-new').value) || 1),
+            unitPrice,
+          });
+          renderItems();
+          searchInputEl.value = '';
+          resultsEl.innerHTML = '';
+        });
+      } catch (err) {
+        panel.innerHTML = `<p class="status err">Помилка: ${escapeHtml(err.message)}</p>`;
+      }
+    }
+
+    saveBtn.addEventListener('click', async () => {
+      if (items.length === 0) {
+        AdminShared.setStatus(detailStatus, 'err', 'У замовленні має лишитись хоча б одна позиція.');
+        return;
+      }
+      saveBtn.disabled = true;
+      AdminShared.setStatus(detailStatus, 'pending', 'Збереження...');
+      try {
+        const res = await fetch('/api/orders', {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: order.id,
+            paid: paidInput.checked,
+            redeemed: redeemedInput.checked,
+            items: items.map((i) => ({
+              productId: i.productId,
+              productName: i.productName,
+              productImage: i.productImage,
+              sourceName: i.sourceName,
+              sourceUrl: i.sourceUrl,
+              size: i.size,
+              colorId: i.colorId,
+              colorName: i.colorName,
+              quantity: i.quantity,
+              unitPrice: i.unitPrice,
+            })),
+          }),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+        AdminShared.setStatus(listStatus, 'ok', 'Замовлення збережено.');
+        loadOrders();
+      } catch (err) {
+        AdminShared.setStatus(detailStatus, 'err', 'Помилка: ' + err.message);
+        saveBtn.disabled = false;
+      }
+    });
+  }
+
+  // --- Filters ---
+
+  statusFilter.addEventListener('click', (e) => {
+    const btn = e.target.closest('.range-pill');
+    if (!btn) return;
+    currentFilter = btn.dataset.filter;
+    statusFilter.querySelectorAll('.range-pill').forEach((b) => b.classList.toggle('active', b === btn));
+    loadOrders();
+  });
+
+  let searchDebounce = null;
+  searchInput.addEventListener('input', () => {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(loadOrders, 300);
+  });
+
+  reloadOrdersBtn.addEventListener('click', loadOrders);
+
+  AdminShared.init('orders').then((email) => {
+    if (email) loadOrders();
+  });
+</script>
+</body>
+</html>

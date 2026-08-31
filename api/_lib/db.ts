@@ -13,7 +13,7 @@ const SCHEMA_LOCK_KEY = 84237551;
 // error — it's a column/table that silently doesn't exist until the next redeploy, so the
 // first sign of it is a query failing against it. Bumping this is the whole point of the
 // fast path existing, not an optional step.
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 export async function ensureSchema(): Promise<void> {
   if (!schemaReady) {
@@ -232,6 +232,55 @@ async function runEnsureSchema(): Promise<void> {
           CHECK (id = 1)
         );
       `);
+      // Checkout is client-only (no payment processing, see CLAUDE.md) — this is the first
+      // server-side record of an order, for the admin panel. telegram_user_id/username/names are
+      // a snapshot from initDataUnsafe.user at checkout time, unvalidated (same trust level as
+      // product_events.telegram_user_id) — acceptable while no real payment flows through this
+      // app. telegram_user_id is indexed now so a future buyer-facing "my orders" read can filter
+      // on it without a migration.
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS orders (
+          id TEXT PRIMARY KEY,
+          telegram_user_id TEXT,
+          telegram_username TEXT,
+          telegram_first_name TEXT,
+          telegram_last_name TEXT,
+          comment TEXT,
+          currency TEXT,
+          total NUMERIC NOT NULL DEFAULT 0,
+          paid BOOLEAN NOT NULL DEFAULT false,
+          paid_at TIMESTAMPTZ,
+          redeemed BOOLEAN NOT NULL DEFAULT false,
+          redeemed_at TIMESTAMPTZ,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+      `);
+      await client.query(`CREATE INDEX IF NOT EXISTS orders_created_at_idx ON orders (created_at DESC);`);
+      await client.query(`CREATE INDEX IF NOT EXISTS orders_telegram_user_id_idx ON orders (telegram_user_id);`);
+      // Denormalized product snapshot (name/image/source) rather than a products FK — a product
+      // can be deleted or its shape rewritten by a re-upload (see the two-repo pipeline note
+      // above), and an order's history has to stay readable regardless of the catalog's current
+      // state. Row-per-item (not a JSONB array on orders) because the admin panel needs to
+      // add/remove individual lines, which is far simpler as SQL row inserts/deletes than mutating
+      // a JSON array.
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS order_items (
+          id SERIAL PRIMARY KEY,
+          order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+          product_id TEXT,
+          product_name TEXT NOT NULL,
+          product_image TEXT,
+          source_name TEXT,
+          source_url TEXT,
+          size TEXT NOT NULL,
+          color_id TEXT,
+          color_name TEXT,
+          quantity INTEGER NOT NULL,
+          unit_price NUMERIC NOT NULL
+        );
+      `);
+      await client.query(`CREATE INDEX IF NOT EXISTS order_items_order_id_idx ON order_items (order_id);`);
 
       // Marks the DDL above as done up to SCHEMA_VERSION so the fast path above can skip it on
       // every future cold start until that constant is bumped again.

@@ -1,6 +1,7 @@
 window.AdminShared = (function () {
   const PAGES = [
     { key: 'dashboard', href: '/admin', label: 'Дашборд', icon: 'dashboard' },
+    { key: 'orders', href: '/admin/orders', label: 'Замовлення', icon: 'shoppingBag' },
     { key: 'sales', href: '/admin/sales', label: 'Розпродажі', icon: 'tag' },
     { key: 'upload', href: '/admin/upload', label: 'Додати розпродаж', icon: 'upload' },
     { key: 'banners', href: '/admin/banners', label: 'Банери', icon: 'image' },

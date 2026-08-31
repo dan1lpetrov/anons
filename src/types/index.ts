@@ -77,6 +77,37 @@ export interface Order {
   telegramUser?: TelegramWebAppUser;
 }
 
+// The buyer-facing "Мої замовлення" screen — GET /api/orders?mine=1 (see api/orders.ts). A
+// server-side snapshot per order line, not the live Product/ProductColor shape: the catalog
+// entry it came from may since be re-uploaded or gone entirely (see CLAUDE.md's two-repo
+// pipeline note), and an order's history has to stay readable regardless.
+export interface MyOrderItem {
+  id: number;
+  productId: string | null;
+  productName: string;
+  productImage: string | null;
+  sourceName: string | null;
+  sourceUrl: string | null;
+  size: string;
+  colorId: string | null;
+  colorName: string | null;
+  quantity: number;
+  unitPrice: number;
+}
+
+export interface MyOrder {
+  id: string;
+  createdAt: string;
+  comment: string | null;
+  currency: 'USD' | 'UAH' | null;
+  total: number;
+  paid: boolean;
+  paidAt: string | null;
+  redeemed: boolean;
+  redeemedAt: string | null;
+  items: MyOrderItem[];
+}
+
 export type SortOption = 'recommended' | 'price-desc' | 'price-asc';
 
 export interface CatalogFilters {

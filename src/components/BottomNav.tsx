@@ -1,4 +1,4 @@
-import { Home, LayoutGrid, ShoppingCart } from 'lucide-react';
+import { Home, LayoutGrid, Receipt, ShoppingCart } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useTelegramContext } from '../hooks/useTelegram';
 
@@ -10,6 +10,7 @@ const TABS = [
   { to: '/', end: true, label: 'Головна', icon: Home },
   { to: '/catalog', end: false, label: 'Каталог', icon: LayoutGrid },
   { to: '/cart', end: true, label: 'Кошик', icon: ShoppingCart },
+  { to: '/orders', end: true, label: 'Замовлення', icon: Receipt },
 ];
 
 export function BottomNav({ cartCount }: BottomNavProps) {

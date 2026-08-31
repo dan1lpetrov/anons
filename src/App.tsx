@@ -14,6 +14,7 @@ import { CartView } from './components/CartView';
 import { CatalogRoute } from './components/CatalogRoute';
 import { Header } from './components/Header';
 import { Home } from './components/Home';
+import { MyOrders } from './components/MyOrders';
 import { OrderSuccess } from './components/OrderSuccess';
 import { ProductDetail } from './components/ProductDetail';
 import { useCart } from './hooks/useCart';
@@ -21,7 +22,7 @@ import { TelegramContext, useTelegram } from './hooks/useTelegram';
 import type { Banner, Order, Product, ProductCardData, ProductsListResponse, ProductsMeta } from './types';
 import { categoriesFromMeta } from './utils/catalog';
 import { logProductEvent, logProductEvents } from './utils/events';
-import { createOrderId, getOrderFromLocalStorage, saveOrderToLocalStorage } from './utils/orderExport';
+import { createOrderId, getOrderFromLocalStorage, saveOrderToLocalStorage, submitOrderToServer } from './utils/orderExport';
 import { getScrollContainer } from './utils/scroll';
 
 interface ProductRouteProps {
@@ -276,6 +277,7 @@ export default function App() {
     };
 
     saveOrderToLocalStorage(order);
+    submitOrderToServer(order);
     // One event per cart line (not deduped by product) so the admin dashboard can derive both a
     // distinct-order count (COUNT DISTINCT orderId) and an order value (SUM quantity*unitPrice).
     logProductEvents(
@@ -349,6 +351,7 @@ export default function App() {
               }
             />
             <Route path="/order/:orderId" element={<OrderRoute onContinue={() => navigate('/')} />} />
+            <Route path="/orders" element={<MyOrders />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>

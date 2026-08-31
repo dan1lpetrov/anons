@@ -5,6 +5,7 @@
     { "source": "/admin/upload", "destination": "/admin-upload.html" },
     { "source": "/admin/weights", "destination": "/admin-weights.html" },
     { "source": "/admin/banners", "destination": "/admin-banners.html" },
+    { "source": "/admin/orders", "destination": "/admin-orders.html" },
     { "source": "/api/auth/logout", "destination": "/api/auth/session" },
     { "source": "/api/auth/me", "destination": "/api/auth/session" },
     { "source": "/product/:id", "destination": "/api/ssr?id=:id" },

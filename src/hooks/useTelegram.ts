@@ -11,7 +11,8 @@ export function useTelegram() {
   }, [tg]);
 
   const user = tg?.initDataUnsafe?.user;
-  const isTelegram = Boolean(tg?.initData);
+  const initData = tg?.initData ?? '';
+  const isTelegram = Boolean(initData);
 
   // Inside real Telegram, follow the client's live theme instead of the browser's
   // prefers-color-scheme (Telegram controls the actual theme the user sees). Outside
@@ -64,6 +65,7 @@ export function useTelegram() {
   return {
     tg,
     user,
+    initData,
     isTelegram,
     colorScheme: tg?.colorScheme ?? 'light',
     haptic,

@@ -83,6 +83,37 @@ export function getOrderFromLocalStorage(orderId: string): Order | undefined {
   return existing.find((order) => order.id === orderId);
 }
 
+// Fire-and-forget POST to persist the order server-side for the admin panel (see
+// api/orders.ts) — mirrors the keepalive+catch-and-ignore pattern in src/utils/events.ts.
+// Checkout itself never processes payment (see CLAUDE.md), so this must never block or fail
+// the confirmation screen; the localStorage copy above remains the source of truth for it.
+export function submitOrderToServer(order: Order): void {
+  const body = JSON.stringify({
+    id: order.id,
+    comment: order.customer.comment,
+    currency: order.items[0]?.product.currency,
+    telegramUser: order.telegramUser,
+    items: order.items.map((entry) => ({
+      productId: entry.product.id,
+      productName: entry.product.name,
+      productImage: entry.color.images[0] ?? entry.product.image,
+      sourceName: entry.product.sourceName,
+      sourceUrl: entry.product.sourceUrl,
+      size: entry.size,
+      colorId: entry.color.id,
+      colorName: entry.color.name,
+      quantity: entry.quantity,
+      unitPrice: entry.lineTotal / entry.quantity,
+    })),
+  });
+  fetch('/api/orders', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+    keepalive: true,
+  }).catch(() => {});
+}
+
 export function createOrderId(): string {
   const now = new Date();
   const date = now.toISOString().slice(0, 10).replace(/-/g, '');

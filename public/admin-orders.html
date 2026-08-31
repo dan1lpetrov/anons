@@ -71,7 +71,7 @@
 
   function formatAmount(value, currency) {
     const n = Number(value) || 0;
-    return currency === 'UAH' ? Math.round(n) : n;
+    return currency === 'UAH' ? Math.round(n) : Math.round(n * 10) / 10;
   }
 
   function fmtPrice(value, currency) {

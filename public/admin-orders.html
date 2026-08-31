@@ -139,7 +139,7 @@
     card.dataset.orderId = o.id;
 
     const telegramBtn = o.telegramUsername
-      ? `<a class="secondary" style="text-decoration:none;" target="_blank" rel="noopener" href="https://t.me/${encodeURIComponent(o.telegramUsername)}">Написати в Telegram</a>`
+      ? `<a class="button secondary" target="_blank" rel="noopener" href="https://t.me/${encodeURIComponent(o.telegramUsername)}">Написати в Telegram</a>`
       : '';
 
     card.innerHTML = `
@@ -271,19 +271,26 @@
 
     function renderItems() {
       itemsBody.innerHTML = items
-        .map(
-          (item, idx) => `
+        .map((item, idx) => {
+          const name = escapeHtml(item.productName);
+          const nameCell = item.sourceUrl
+            ? `<a href="${escapeHtml(item.sourceUrl)}" target="_blank" rel="noopener">${name}</a>`
+            : name;
+          const colorCell = item.productImage
+            ? `<img src="${escapeHtml(item.productImage)}" alt="" class="color-dot" />${escapeHtml(item.colorName || '—')}`
+            : escapeHtml(item.colorName || '—');
+          return `
         <tr>
-          <td>${escapeHtml(item.productName)}</td>
+          <td>${nameCell}</td>
           <td>${escapeHtml(item.size)}</td>
-          <td>${escapeHtml(item.colorName || '—')}</td>
+          <td>${colorCell}</td>
           <td class="num"><input type="number" min="1" class="f-qty" data-idx="${idx}" value="${item.quantity}" style="width: 56px; text-align: right;" /></td>
           <td class="num">${fmtPrice(item.unitPrice, order.currency)}</td>
           <td class="num">${fmtPrice(lineTotal(item), order.currency)}</td>
           <td><button type="button" class="icon-btn danger f-remove" data-idx="${idx}" title="Прибрати">${AdminShared.icon('trash', 14)}</button></td>
         </tr>
-      `,
-        )
+      `;
+        })
         .join('');
 
       itemsBody.querySelectorAll('.f-qty').forEach((input) => {
@@ -330,7 +337,7 @@
             (p) => `
           <div class="item-card product-search-result" data-id="${escapeHtml(p.id)}">
             <div class="item-card__row">
-              <img src="${escapeHtml(p.image)}" alt="" style="width: 36px; height: 36px; object-fit: cover; border-radius: 6px;" />
+              <img src="${escapeHtml(p.image)}" alt="" class="thumb-sm" />
               <div class="item-card__identity">
                 <span class="item-card__name">${escapeHtml(p.name)}</span>
                 <span class="item-card__subtitle">${fmtPrice(p.price, p.currency)}</span>
@@ -364,11 +371,19 @@
 
         panel.innerHTML = `
           <div class="field-grid item-form-grid">
-            <div class="field">
+            <div class="field field-span-2">
               <label>Колір</label>
-              <select class="f-color">
-                ${product.colors.map((c) => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')}
-              </select>
+              <div class="color-swatch-row">
+                ${product.colors
+                  .map(
+                    (c, i) => `
+                  <button type="button" class="color-swatch-btn f-color-btn ${i === 0 ? 'active' : ''}" data-color-id="${escapeHtml(c.id)}" title="${escapeHtml(c.name)}">
+                    <img src="${escapeHtml(c.thumbnail)}" alt="${escapeHtml(c.name)}" />
+                  </button>
+                `,
+                  )
+                  .join('')}
+              </div>
             </div>
             <div class="field">
               <label>Розмір</label>
@@ -385,19 +400,26 @@
           </div>
         `;
 
-        const colorSelect = panel.querySelector('.f-color');
+        const colorBtns = [...panel.querySelectorAll('.f-color-btn')];
         const sizeSelect = panel.querySelector('.f-size');
+        let selectedColorId = colorBtns[0]?.dataset.colorId ?? null;
 
         function fillSizes() {
-          const color = product.colors.find((c) => c.id === colorSelect.value) || product.colors[0];
+          const color = product.colors.find((c) => c.id === selectedColorId) || product.colors[0];
           const sizes = (color && color.sizes && color.sizes.length ? color.sizes : product.sizes) || [];
           sizeSelect.innerHTML = sizes.map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
         }
-        colorSelect.addEventListener('change', fillSizes);
+        colorBtns.forEach((btn) => {
+          btn.addEventListener('click', () => {
+            selectedColorId = btn.dataset.colorId;
+            colorBtns.forEach((b) => b.classList.toggle('active', b === btn));
+            fillSizes();
+          });
+        });
         fillSizes();
 
         panel.querySelector('.f-confirm-add').addEventListener('click', () => {
-          const color = product.colors.find((c) => c.id === colorSelect.value) || product.colors[0];
+          const color = product.colors.find((c) => c.id === selectedColorId) || product.colors[0];
           const unitPrice = (color && color.price != null ? color.price : product.price) ?? 0;
           items.push({
             productId: product.id,
